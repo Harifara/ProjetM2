@@ -1,0 +1,238 @@
+_format_version: "3.0"
+_transform: true
+
+# =====================
+# SERVICES & ROUTES
+# =====================
+
+services:
+  # =====================
+  # AUTH SERVICE
+  # =====================
+  - name: auth-service
+    url: http://auth_service:8000
+    tags:
+      - auth
+    routes:
+      - name: auth-route
+        paths:
+          - /api/auth
+        strip_path: false
+        preserve_host: true
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - http://localhost:8080    # facultatif pour tous
+          methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - PATCH
+            - OPTIONS
+          headers:
+            - Accept
+            - Authorization
+            - Content-Type
+            - Origin
+          exposed_headers:
+            - X-Auth-Token
+          credentials: true
+          max_age: 3600
+          preflight_continue: false
+
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+
+ # =====================
+# RH SERVICE
+# =====================
+  - name: rh-service
+    url: http://rh_service:8000
+    tags:
+      - rh
+    routes:
+      - name: rh-route
+        paths:
+          - /api/rh
+        strip_path: false        # ⚠️ on ne retire plus /api/rh
+        preserve_host: true
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS              # ⚠️ indispensable pour le préflight
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - http://localhost:8080
+          methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - PATCH
+            - OPTIONS
+          headers:
+            - Accept
+            - Authorization
+            - Content-Type
+            - Origin
+          exposed_headers:
+            - X-Auth-Token
+          credentials: true
+          max_age: 3600
+          preflight_continue: false
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+
+
+  # =====================
+  # COORDINATEUR SERVICE
+  # =====================
+  - name: coordinateur-service
+    url: http://coordinateur_service:8000
+    tags:
+      - coordinateur
+    routes:
+      - name: coordinateur-route
+        paths:
+          - /api/coordinateur
+        strip_path: true
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - PATCH
+            - OPTIONS
+          headers:
+            - Accept
+            - Authorization
+            - Content-Type
+          credentials: true
+          max_age: 3600
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+
+  # =====================
+  # FINANCE SERVICE
+  # =====================
+  - name: finance-service
+    url: http://finance_service:8000
+    tags:
+      - finance
+    routes:
+      - name: finance-route
+        paths:
+          - /api/finance
+        strip_path: true
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - PATCH
+            - OPTIONS
+          headers:
+            - Accept
+            - Authorization
+            - Content-Type
+          credentials: true
+          max_age: 3600
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+
+  # =====================
+  # NOTIFICATION SERVICE
+  # =====================
+  - name: notification-service
+    url: http://notification_service:8000
+    tags:
+      - notification
+    routes:
+      - name: notification-route
+        paths:
+          - /api/notifications
+        strip_path: true
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - PATCH
+            - OPTIONS
+          headers:
+            - Accept
+            - Authorization
+            - Content-Type
+          credentials: true
+          max_age: 3600
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+
+
+# =====================
+# GLOBAL PLUGINS
+# =====================
+plugins:
+  - name: prometheus
+  # 👇 le plugin 'request-id' est désactivé car il n’est pas inclus dans l’image officielle
+  - name: correlation-id
+    config:
+      header_name: X-Correlation-ID
+      echo_downstream: true

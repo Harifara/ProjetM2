@@ -1,0 +1,280 @@
+services:
+  # =====================
+  # KONG API GATEWAY (DB-less)
+  # =====================
+  kong:
+    image: kong
+    container_name: kong
+    restart: unless-stopped
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: "/kong/kong.yml"
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+
+      # 🔹 Logging
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_LOG_LEVEL: debug
+      KONG_PLUGINS: bundled,correlation-id
+
+
+    volumes:
+      - ./kong/kong.yml:/kong/kong.yml:ro
+
+    ports:
+      - "9000:8000"   # Proxy
+      - "8001:8001"   # Admin API
+
+    depends_on:
+      - auth_service
+      - rh_service
+      - stock_service
+      - coordinateur_service
+      - finance_service
+      - notification_service
+
+    networks:
+      - project_network
+
+
+  # =====================
+  # REDIS
+  # =====================
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - project_network
+
+  # =====================
+  # AUTH SERVICE & DB
+  # =====================
+  auth_db:
+    image: postgres:15-alpine
+    container_name: auth_db
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql/data
+    networks:
+      - project_network
+
+  auth_service:
+    build: ./auth_service
+    container_name: auth_service
+    env_file:
+      - ./auth_service/.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - auth_db
+    volumes:
+      - ./auth_service:/app
+    command: ["/app/entrypoint.sh"]
+    restart: unless-stopped
+    networks:
+      - project_network
+
+  # =====================
+  # RH SERVICE & DB
+  # =====================
+  rh_db:
+    image: postgres:15-alpine
+    container_name: rh_db
+    environment:
+      POSTGRES_DB: rh_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - rh_postgres_data:/var/lib/postgresql/data
+    networks:
+      - project_network
+
+  rh_service:
+    build: ./rh_service
+    container_name: rh_service
+    env_file:
+      - ./rh_service/.env
+    ports:
+      - "8020:8000"
+    depends_on:
+      - rh_db
+      - auth_service
+    volumes:
+      - ./rh_service:/app
+    command: ["/app/entrypoint.sh"]
+    restart: unless-stopped
+    networks:
+      - project_network
+
+  # =====================
+  # STOCK SERVICE & DB
+  # =====================
+  stock_db:
+    image: postgres:15-alpine
+    container_name: stock_db
+    environment:
+      POSTGRES_DB: stock_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - stock_postgres_data:/var/lib/postgresql/data
+    networks:
+      - project_network
+
+  stock_service:
+    build: ./stock_service
+    container_name: stock_service
+    env_file:
+      - ./stock_service/.env
+    ports:
+      - "8030:8000"
+    depends_on:
+      - stock_db
+      - auth_service
+    volumes:
+      - ./stock_service:/app
+    command: ["/app/entrypoint.sh"]
+    restart: unless-stopped
+    networks:
+      - project_network
+
+  # =====================
+  # COORDINATEUR SERVICE & DB
+  # =====================
+  coordinateur_db:
+    image: postgres:15-alpine
+    container_name: coordinateur_db
+    environment:
+      POSTGRES_DB: coordinateur_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - coordinateur_postgres_data:/var/lib/postgresql/data
+    networks:
+      - project_network
+
+  coordinateur_service:
+    build: ./coordinateur_service
+    container_name: coordinateur_service
+    env_file:
+      - ./coordinateur_service/.env
+    ports:
+      - "8040:8000"
+    depends_on:
+      - coordinateur_db
+      - auth_service
+    volumes:
+      - ./coordinateur_service:/app
+    command: ["/app/entrypoint.sh"]
+    restart: unless-stopped
+    networks:
+      - project_network
+
+  # =====================
+  # FINANCE SERVICE & DB
+  # =====================
+  finance_db:
+    image: postgres:15-alpine
+    container_name: finance_db
+    environment:
+      POSTGRES_DB: finance_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - finance_postgres_data:/var/lib/postgresql/data
+    networks:
+      - project_network
+
+  finance_service:
+    build: ./finance_service
+    container_name: finance_service
+    env_file:
+      - ./finance_service/.env
+    ports:
+      - "8050:8000"
+    depends_on:
+      - finance_db
+      - auth_service
+    volumes:
+      - ./finance_service:/app
+    command: ["/app/entrypoint.sh"]
+    restart: unless-stopped
+    networks:
+      - project_network
+
+  # =====================
+  # NOTIFICATION SERVICE & DB
+  # =====================
+  notification_db:
+    image: postgres:15-alpine
+    container_name: notification_db
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - notification_postgres_data:/var/lib/postgresql/data
+    networks:
+      - project_network
+
+  notification_service:
+    build: ./notification_service
+    container_name: notification_service
+    env_file:
+      - ./notification_service/.env
+    ports:
+      - "8060:8000"
+    depends_on:
+      - notification_db
+      - redis
+    volumes:
+      - ./notification_service:/app
+    command: ["/app/entrypoint.sh"]
+    restart: unless-stopped
+    networks:
+      - project_network
+
+  # =====================
+  # FRONTEND
+  # =====================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "8080:80"
+    environment:
+      - API_URL=http://localhost:9000/api
+    depends_on:
+      - kong
+    restart: unless-stopped
+    networks:
+      - project_network
+
+# =====================
+# Réseaux & Volumes
+# =====================
+networks:
+  project_network:
+    driver: bridge
+
+volumes:
+  auth_postgres_data:
+  rh_postgres_data:
+  stock_postgres_data:
+  coordinateur_postgres_data:
+  finance_postgres_data:
+  notification_postgres_data:
+  redis_data:

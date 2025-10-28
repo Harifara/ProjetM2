@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "8080:80" # ou 5173:5173 si tu veux lancer le dev server Vite
+    environment:
+      - VITE_API_URL=http://localhost:9000
+    networks:
+      - project_network
+    restart: unless-stopped
+
+networks:
+  project_network:
+    driver: bridge

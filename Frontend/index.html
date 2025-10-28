@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>E.C.A.R.T - Système de Gestion</title>
+    <meta name="description" content="Système de gestion interne E.C.A.R.T" />
+    <meta name="author" content="E.C.A.R.T" />
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#228B22" />
+
+    <!-- Configuration runtime (injectée par Docker) -->
+    <script src="/config.js"></script>
+
+    <meta property="og:title" content="E.C.A.R.T - Système de Gestion" />
+    <meta property="og:description" content="Système de gestion interne E.C.A.R.T" />
+    <meta property="og:type" content="website" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    
+  </body>
+</html>
