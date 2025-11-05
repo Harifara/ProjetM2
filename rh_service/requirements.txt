@@ -1,0 +1,9 @@
+Django
+djangorestframework
+django-cors-headers
+django-filter
+psycopg2-binary
+python-decouple
+PyJWT
+gunicorn
+Pillow==10.3.0

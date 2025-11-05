@@ -1,0 +1,75 @@
+_format_version: "3.0"
+_transform: true
+
+# =====================
+# 🔐 CONSUMERS (JWT)
+# =====================
+consumers:
+  - username: auth-service
+    custom_id: "auth-service"
+    jwt_secrets:
+      - consumer: auth-service
+        algorithm: HS256
+        key: auth-service                # correspond à "iss" dans le token
+        secret: my_super_secret_key_123  # doit être identique à settings.py
+
+# =====================
+# 🚪 SERVICES
+# =====================
+
+# --- AUTH SERVICE ---
+services:
+  - name: auth-service
+    url: http://auth_service:8000
+    routes:
+      - name: auth-route
+        paths: ["/api/auth"]
+        strip_path: false
+        preserve_host: true
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
+    plugins:
+      - name: cors
+        config:
+          origins: ["http://localhost:8080"]
+          methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
+          headers: ["Accept","Authorization","Content-Type","Origin"]
+          exposed_headers: ["X-Auth-Token"]
+          credentials: true
+          max_age: 3600
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+
+# --- RH SERVICE ---
+  - name: rh-service
+    url: http://rh_service:8000
+    routes:
+      - name: rh-route
+        paths: ["/api/rh"]
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: jwt
+        config:
+          secret_is_base64: false
+          key_claim_name: iss
+          claims_to_verify: [exp]
+      - name: cors
+        config:
+          origins: ["http://localhost:8080"]
+          methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
+          headers: ["Authorization","Content-Type","Accept"]
+          exposed_headers: ["Authorization"]
+          credentials: true
+          max_age: 3600
+
+# =====================
+# 🌡️ PLUGINS GLOBAUX
+# =====================
+plugins:
+  - name: prometheus
+  - name: correlation-id
+    config:
+      header_name: X-Correlation-ID
+      echo_downstream: true
