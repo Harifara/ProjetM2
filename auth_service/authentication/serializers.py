@@ -1,47 +1,33 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import User, AuditLog, Notification
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-
+from .models import User, AuditLog, Notification, UserRole
 
 # ==============================
 # 👤 Sérialiseur principal User
 # ==============================
 class UserSerializer(serializers.ModelSerializer):
-    id = serializers.UUIDField(read_only=True)
-
     class Meta:
         model = User
         fields = [
-            'id',
-            'username',
-            'email',
-            'full_name',
-            'role',
-            'is_active',
-            'created_at',
-            'updated_at',
+            'id', 'username', 'email', 'full_name',
+            'role', 'is_active', 'magasin_id', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 # ==============================
-# 🧩 Création d’utilisateur
+# 🆕 Création d'utilisateur
 # ==============================
 class UserCreateSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
-    password_confirm = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
+    password = serializers.CharField(write_only=True)
+    password_confirm = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
         fields = [
-            'username',
-            'email',
-            'full_name',
-            'role',
-            'password',
-            'password_confirm',
-            'is_active',
+            'username', 'email', 'full_name', 'role',
+            'magasin_id', 'password', 'password_confirm', 'is_active'
         ]
 
     def validate(self, attrs):
@@ -57,45 +43,34 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
 
 # ==============================
-# ✏️ Mise à jour utilisateur
-# ==============================
-# ==============================
-# ✏️ Mise à jour utilisateur
+# ✏️ Mise à jour d'utilisateur
 # ==============================
 class UserUpdateSerializer(serializers.ModelSerializer):
-    # Ajouter le mot de passe si besoin
-    password = serializers.CharField(write_only=True, required=False, style={'input_type': 'password'})
-    password_confirm = serializers.CharField(write_only=True, required=False, style={'input_type': 'password'})
+    password = serializers.CharField(write_only=True, required=False)
+    password_confirm = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'full_name', 'role', 'is_active', 'password', 'password_confirm']
+        fields = [
+            'username', 'email', 'full_name', 'role',
+            'is_active', 'magasin_id', 'password', 'password_confirm'
+        ]
 
     def validate(self, attrs):
-        # Vérifier si le mot de passe est modifié
-        password = attrs.get('password')
-        password_confirm = attrs.get('password_confirm')
-        if password or password_confirm:
-            if password != password_confirm:
+        if attrs.get('password') or attrs.get('password_confirm'):
+            if attrs.get('password') != attrs.get('password_confirm'):
                 raise serializers.ValidationError({"password": "Les mots de passe ne correspondent pas."})
         return attrs
 
     def update(self, instance, validated_data):
-        # Supprimer password_confirm pour éviter erreur
         validated_data.pop('password_confirm', None)
         password = validated_data.pop('password', None)
-
-        # Mettre à jour les champs standards
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-
-        # Mettre à jour le mot de passe si présent
         if password:
             instance.set_password(password)
-
         instance.save()
         return instance
-
 
 
 # ==============================
@@ -123,29 +98,26 @@ class LoginSerializer(serializers.Serializer):
         username = attrs.get('username')
         password = attrs.get('password')
 
-        if username and password:
-            user = authenticate(username=username, password=password)
-            if not user:
-                raise serializers.ValidationError('Identifiants invalides.')
-            if not user.is_active:
-                raise serializers.ValidationError('Ce compte est désactivé.')
-            attrs['user'] = user
-        else:
-            raise serializers.ValidationError('Le nom d\'utilisateur et le mot de passe sont requis.')
+        if not username or not password:
+            raise serializers.ValidationError("Le nom d'utilisateur et le mot de passe sont requis.")
 
+        user = authenticate(username=username, password=password)
+        if not user:
+            raise serializers.ValidationError("Identifiants invalides.")
+        if not user.is_active:
+            raise serializers.ValidationError("Ce compte est désactivé.")
+
+        attrs['user'] = user
         return attrs
 
 
 # ==============================
 # 🕵️‍♂️ Audit Log
 # ==============================
-from rest_framework import serializers
-from .models import AuditLog
-
 class AuditLogSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
     user = serializers.PrimaryKeyRelatedField(read_only=True)
-    entity_id = serializers.UUIDField(read_only=True, allow_null=True)
+    entity_id = serializers.CharField(allow_null=True)
     user_info = serializers.SerializerMethodField()
     action = serializers.CharField(source='action_type', read_only=True)
 
@@ -177,7 +149,6 @@ class AuditLogSerializer(serializers.ModelSerializer):
         return None
 
 
-
 # ==============================
 # 🔔 Notifications
 # ==============================
@@ -197,9 +168,13 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
-        # UUID doit être converti en string
         token["user_id"] = str(user.id)
         token["username"] = user.username
         token["role"] = user.role
         token["email"] = user.email
+
+        # Ajout du magasin pour les magasiniers
+        if user.role == UserRole.MAGASINIER:
+            token["magasin_id"] = str(user.magasin_id) if user.magasin_id else None
+
         return token

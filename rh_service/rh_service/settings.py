@@ -2,46 +2,55 @@ from pathlib import Path
 from datetime import timedelta
 from decouple import config
 import os
+import mimetypes
 
+# === Répertoires de base ===
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# === Sécurité ===
 SECRET_KEY = config("SECRET_KEY", default="rh_service_secret_key_123")
 DEBUG = config("DEBUG", default=True, cast=bool)
+ALLOWED_HOSTS = config("DJANGO_ALLOWED_HOSTS", default="localhost,127.0.0.1").split(",")
 
-ALLOWED_HOSTS = config("DJANGO_ALLOWED_HOSTS", default="localhost").split(",")
-
+# === Applications installées ===
 INSTALLED_APPS = [
+    # Apps internes
     "rh",
+
+    # Apps Django de base
+    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django.contrib.admin",
+
+    # Extensions
     "corsheaders",
     "rest_framework",
     "django_filters",
-    
-    # "authentication",
 ]
 
+# === Middleware ===
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
-    "django.middleware.common.CommonMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-CORS_ALLOW_ALL_ORIGINS = config("CORS_ALLOW_ALL_ORIGINS", default="True") == "True"
-CORS_ALLOW_CREDENTIALS = config("CORS_ALLOW_CREDENTIALS", default="True") == "True"
+# === CORS (Cross-Origin Resource Sharing) ===
+CORS_ALLOW_ALL_ORIGINS = True  # ⚠️ À restreindre en production
+CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = ["*"]
 CORS_EXPOSE_HEADERS = ["*"]
 CORS_ALLOW_METHODS = ["GET", "POST", "PATCH", "DELETE", "OPTIONS", "PUT"]
 
+# === URLs / Templates / WSGI ===
 ROOT_URLCONF = "rh_service.urls"
 WSGI_APPLICATION = "rh_service.wsgi.application"
 
@@ -61,17 +70,19 @@ TEMPLATES = [
     },
 ]
 
+# === Base de données ===
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": config("DB_NAME", default="rh_db"),
         "USER": config("DB_USER", default="postgres"),
         "PASSWORD": config("DB_PASSWORD", default="postgres"),
-        "HOST": config("DB_HOST", default="rh_db"),
+        "HOST": config("DB_HOST", default="rh_db"),  # pour Docker network
         "PORT": config("DB_PORT", default="5432"),
     }
 }
 
+# === Django REST Framework ===
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rh.authentication.KongJWTAuthentication",
@@ -86,17 +97,32 @@ REST_FRAMEWORK = {
     ],
 }
 
+# === JWT (authentification inter-services) ===
 JWT_SECRET = config("JWT_SECRET", default="my_super_secret_key_123")
 JWT_ALGORITHM = "HS256"
 JWT_ISSUER = "auth-service"
-
 AUTH_SERVICE_URL = config("AUTH_SERVICE_URL", default="http://auth_service:8000")
 
+# === Internationalisation ===
 LANGUAGE_CODE = "fr-fr"
 TIME_ZONE = "Indian/Antananarivo"
 USE_I18N = True
 USE_TZ = True
 
+# === Fichiers statiques et médias ===
 STATIC_URL = "/static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
+
+# 💡 URL absolue complète pour les médias (utilisable côté frontend)
+MEDIA_FULL_URL = config("MEDIA_FULL_URL", default="http://localhost:9000")
+
+# === Fallback par défaut pour les clés primaires ===
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# === Fix pour fichiers JS et images en dev ===
+if DEBUG:
+    mimetypes.add_type("application/javascript", ".js", True)

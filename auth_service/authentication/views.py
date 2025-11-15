@@ -10,7 +10,10 @@ from django.contrib.auth import logout
 from django_filters.rest_framework import DjangoFilterBackend
 from datetime import datetime, timedelta
 import jwt
+import uuid
 from decouple import config
+from rest_framework.views import APIView
+
 
 from .serializers import (
     CustomTokenObtainPairSerializer,
@@ -22,12 +25,13 @@ from .serializers import (
     AuditLogSerializer,
     NotificationSerializer,
 )
-from .models import User, AuditLog, Notification
+from .models import User, AuditLog, Notification, UserRole
 from .permissions import IsAdmin, IsOwnerOrAdmin
 from .utils import log_audit
 
+
 # ==========================
-# 🔹 Health check
+# 🔹 Health Check
 # ==========================
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -36,7 +40,7 @@ def health(request):
 
 
 # ==========================
-# 🔹 Verify token
+# 🔹 Verify JWT Token
 # ==========================
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
@@ -58,29 +62,33 @@ def verify_token(request):
 
 
 # ==========================
-# 🔹 Kong Token (JWT pour Kong Gateway)
+# 🔹 Kong JWT Token
 # ==========================
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def kong_token(request):
     """
-    Génère un JWT valide pour Kong Gateway
+    Génère un JWT compatible avec Kong Gateway
     """
+    user = request.user
     secret = config("KONG_JWT_SECRET", default="my_super_secret_key_123")
+
     payload = {
         "iss": "auth-service",
-        "sub": str(request.user.id),
-        "username": request.user.username,
+        "sub": str(user.id),
+        "username": user.username,
+        "role": user.role,
         "exp": datetime.utcnow() + timedelta(hours=1),
     }
+
+    if user.role == UserRole.MAGASINIER and user.magasin_id:
+        payload["magasin_id"] = str(user.magasin_id)
 
     token = jwt.encode(payload, secret, algorithm="HS256")
     if isinstance(token, bytes):
         token = token.decode("utf-8")
 
     return Response({"kong_token": token})
-
-
 
 
 # ==========================
@@ -119,14 +127,18 @@ class AuthViewSet(viewsets.GenericViewSet):
         refresh = RefreshToken.for_user(user)
         access = refresh.access_token
 
-        # Génération du token pour Kong
+        # Génération du token Kong
         secret = config("KONG_JWT_SECRET", default="my_super_secret_key_123")
         payload = {
             "iss": "auth-service",
             "sub": str(user.id),
             "username": user.username,
+            "role": user.role,
             "exp": datetime.utcnow() + timedelta(hours=1),
         }
+        if user.role == UserRole.MAGASINIER and user.magasin_id:
+            payload["magasin_id"] = str(user.magasin_id)
+
         kong_token = jwt.encode(payload, secret, algorithm="HS256")
         if isinstance(kong_token, bytes):
             kong_token = kong_token.decode("utf-8")
@@ -156,28 +168,41 @@ class AuthViewSet(viewsets.GenericViewSet):
     def register(self, request):
         serializer = UserCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        role = serializer.validated_data.get('role')
+        magasin_id = serializer.validated_data.get('magasin_id')
+
+        if role == UserRole.MAGASINIER:
+            if not magasin_id:
+                return Response({"magasin_id": "Le magasin est requis pour un magasinier."}, status=400)
+            if User.objects.filter(magasin_id=magasin_id).exists():
+                return Response({"magasin_id": "Ce magasin est déjà assigné à un autre magasinier."}, status=400)
+
         user = serializer.save()
         log_audit(
             user=user,
             action_type="REGISTER",
             entity_type="User",
             entity_id=str(user.id),
-            details={"username": user.username, "email": user.email},
+            details={"username": user.username, "email": user.email, "magasin_id": str(user.magasin_id) if user.magasin_id else None},
             request=request,
         )
         return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
-    
+
+    # --- Update utilisateur ---
     @action(detail=True, methods=['patch'], url_path='update', permission_classes=[IsAuthenticated])
     def update_user(self, request, pk=None):
-        """
-        Met à jour un utilisateur (PATCH)
-        """
-        user = self.get_object()  # récupère l'utilisateur ciblé par l'URL
+        user = self.get_object()
         serializer = UserUpdateSerializer(user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+
+        magasin_id = request.data.get('magasin_id')
+        role = request.data.get('role', user.role)
+        if role == UserRole.MAGASINIER and magasin_id:
+            if User.objects.filter(magasin_id=magasin_id).exclude(id=user.id).exists():
+                return Response({"magasin_id": "Ce magasin est déjà assigné à un autre magasinier."}, status=400)
+
         updated_user = serializer.save()
 
-        # Log audit
         log_audit(
             user=request.user,
             action_type='UPDATE_USER',
@@ -191,7 +216,7 @@ class AuthViewSet(viewsets.GenericViewSet):
 
 
 # ==========================
-# 🔹 Users
+# 🔹 Users Management
 # ==========================
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all().order_by('username')
@@ -208,6 +233,13 @@ class UserViewSet(viewsets.ModelViewSet):
             return UserUpdateSerializer
         return UserSerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.role == UserRole.MAGASINIER:
+            qs = qs.filter(id=user.id)
+        return qs
+
     def perform_create(self, serializer):
         user = serializer.save()
         log_audit(
@@ -215,7 +247,7 @@ class UserViewSet(viewsets.ModelViewSet):
             action_type='CREATE_USER',
             entity_type='User',
             entity_id=str(user.id),
-            details={'username': user.username, 'role': user.role},
+            details={'username': user.username, 'role': user.role, 'magasin_id': str(user.magasin_id) if user.magasin_id else None},
             request=self.request,
         )
 
@@ -226,7 +258,7 @@ class UserViewSet(viewsets.ModelViewSet):
             action_type='UPDATE_USER',
             entity_type='User',
             entity_id=str(user.id),
-            details={'username': user.username},
+            details={'username': user.username, 'magasin_id': str(user.magasin_id) if user.magasin_id else None},
             request=self.request,
         )
 
@@ -277,7 +309,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
 
 # ==========================
-# 🔹 Audit logs
+# 🔹 Audit Logs
 # ==========================
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AuditLogSerializer
@@ -291,7 +323,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         user = self.request.user
         queryset = AuditLog.objects.select_related('user').all()
-        if not user.is_staff:
+        if user.role == UserRole.MAGASINIER:
             queryset = queryset.filter(user=user)
         return queryset
 
@@ -303,7 +335,47 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 # ==========================
-# 🔹 JWT custom view
+# 🔹 JWT Custom View
 # ==========================
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])  # Autorise rh_service à envoyer des logs
+def receive_external_log(request):
+    data = request.data
+    try:
+        AuditLog.objects.create(
+            id=uuid.uuid4(),
+            user=None,
+            action_type=data.get("action_type"),
+            entity_type=data.get("entity_type"),
+            entity_id=data.get("entity_id"),
+            details=data.get("details", {}),
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
+        return Response({"status": "ok"})
+    except Exception as e:
+        return Response({"status": "error", "message": str(e)}, status=500)
+
+class CombinedLogsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Logs locaux auth_service
+        local_logs = AuditLog.objects.all().order_by('-timestamp')
+        local_serialized = AuditLogSerializer(local_logs, many=True).data
+
+        # Optionnel : récupérer les logs RH depuis rh_service
+        try:
+            response = requests.get("http://rh_service:8000/api/rh/logs/", timeout=5)
+            rh_logs = response.json() if response.status_code == 200 else []
+        except Exception as e:
+            print(f"Erreur récupération logs RH : {e}")
+            rh_logs = []
+
+        all_logs = local_serialized + rh_logs
+        all_logs_sorted = sorted(all_logs, key=lambda x: x['timestamp'], reverse=True)
+        return Response(all_logs_sorted)

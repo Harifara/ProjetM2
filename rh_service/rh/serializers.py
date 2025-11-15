@@ -1,22 +1,12 @@
 from rest_framework import serializers
-from django.contrib.auth.models import User
 from .models import (
-    District, Commune, Fokontany,
-    Department, Function, Contract,
-    Employee, Assignment, CV,
-    LeaveType, LeaveRequest,
-    Payslip, PaymentRequest
+    District, Commune, Fokontany, Fonction, Affectation,
+    Employer, TypeConge, Conge, TypeContrat, Contrat, Location,
+    Electricite, ModePayement, Demande, Payement,
+    TypeAchat, Achat
 )
+from django.utils import timezone
 
-# ==================== UTILISATEUR ====================
-
-class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name']
-
-
-# ==================== GEOGRAPHIE ====================
 
 class DistrictSerializer(serializers.ModelSerializer):
     class Meta:
@@ -42,202 +32,267 @@ class FokontanySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'code', 'commune', 'commune_id', 'created_at', 'updated_at']
 
 
-# ==================== RESSOURCES HUMAINES ====================
-
-class DepartmentSerializer(serializers.ModelSerializer):
+class FonctionSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Department
+        model = Fonction
         fields = '__all__'
 
 
-class FunctionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Function
-        fields = '__all__'
 
 
-class ContractSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Contract
-        fields = '__all__'
+
+from rest_framework import serializers
+from .models import Employer, Fonction, District
+from .serializers import FonctionSerializer, DistrictSerializer
 
 
-class EmployeeSerializer(serializers.ModelSerializer):
-    user = serializers.SerializerMethodField(read_only=True)
-    user_id = serializers.CharField(write_only=True, required=False)
-
-    fokontany = FokontanySerializer(read_only=True)
-    fokontany_id = serializers.UUIDField(write_only=True, required=False)
-    commune = CommuneSerializer(read_only=True)
-    commune_id = serializers.UUIDField(write_only=True, required=False)
+class EmployerSerializer(serializers.ModelSerializer):
+    fonction = FonctionSerializer(read_only=True)
     district = DistrictSerializer(read_only=True)
-    district_id = serializers.UUIDField(write_only=True, required=False)
-    department = DepartmentSerializer(read_only=True)
-    department_id = serializers.UUIDField(write_only=True, required=False)
-    function = FunctionSerializer(read_only=True)
-    function_id = serializers.UUIDField(write_only=True, required=False)
-    contract = ContractSerializer(read_only=True)
-    contract_id = serializers.UUIDField(write_only=True, required=True)
+    fonction_id = serializers.PrimaryKeyRelatedField(
+        queryset=Fonction.objects.all(), source='fonction', write_only=True, allow_null=True, required=False
+    )
+    district_id = serializers.PrimaryKeyRelatedField(
+        queryset=District.objects.all(), source='district', write_only=True, allow_null=True, required=False
+    )
+    photo_profil = serializers.ImageField(required=False, allow_null=True, allow_empty_file=True)
+    cv = serializers.FileField(required=False, allow_null=True, allow_empty_file=True)
 
     class Meta:
-        model = Employee
+        model = Employer
         fields = [
-            'id', 'user', 'user_id', 'employee_number',
-            'first_name', 'last_name', 'email', 'phone', 'photo',
-            'date_of_birth', 'gender', 'address',
-            'fokontany', 'fokontany_id', 'commune', 'commune_id',
-            'district', 'district_id', 'department', 'department_id',
-            'function', 'function_id', 'contract', 'contract_id',
-            'hire_date', 'status', 'salary', 'created_at', 'updated_at'
+            'id', 'nom_employer', 'prenom_employer', 'date_naissance', 'status_employer',
+            'date_entree', 'email', 'telephone', 'adresse',
+            'photo_profil', 'cv', 'diplome', 'domaine_etude',
+            'fonction', 'fonction_id', 'district', 'district_id',
+            'created_at', 'updated_at'
         ]
 
-    def get_user(self, obj):
-        if hasattr(obj, "user") and obj.user:
-            return UserSerializer(obj.user).data
-        return None
+    def validate_status_employer(self, value):
+        if value not in dict(Employer.STATUS_CHOICES):
+            raise serializers.ValidationError("Status invalide")
+        return value
+
+
+
+class AffectationSerializer(serializers.ModelSerializer):
+    # Lecture
+    employer = EmployerSerializer(read_only=True)
+    ancienne_fonction = FonctionSerializer(read_only=True)
+    ancien_district = DistrictSerializer(read_only=True)
+    nouveau_fonction = FonctionSerializer(read_only=True)
+    nouveau_district = DistrictSerializer(read_only=True)
+
+    # Écriture
+    employer_id = serializers.UUIDField(write_only=True)
+    nouveau_fonction_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    nouveau_district_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+
+    class Meta:
+        model = Affectation
+        fields = [
+            'id',
+            'employer', 'employer_id',
+            'ancienne_fonction', 'ancien_district',
+            'nouveau_fonction', 'nouveau_fonction_id',
+            'nouveau_district', 'nouveau_district_id',
+            'type_affectation', 'status_affectation',
+            'date_creation_affectation', 'date_fin',
+            'remarque', 'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'employer',
+            'ancienne_fonction', 'ancien_district',
+            'date_creation_affectation', 'created_at', 'updated_at'
+        ]
 
     def create(self, validated_data):
-        # Extraire les ForeignKeys
-        fokontany_id = validated_data.pop("fokontany_id", None)
-        commune_id = validated_data.pop("commune_id", None)
-        district_id = validated_data.pop("district_id", None)
-        department_id = validated_data.pop("department_id", None)
-        function_id = validated_data.pop("function_id", None)
-        contract_id = validated_data.pop("contract_id")
+        employer_id = validated_data.pop('employer_id')
+        validated_data['employer'] = Employer.objects.get(id=employer_id)
 
-        employee = Employee(**validated_data)
-        if fokontany_id:
-            employee.fokontany_id = fokontany_id
-        if commune_id:
-            employee.commune_id = commune_id
-        if district_id:
-            employee.district_id = district_id
-        if department_id:
-            employee.department_id = department_id
-        if function_id:
-            employee.function_id = function_id
-        employee.contract_id = contract_id
-        employee.save()
-        return employee
+        nouveau_fonction_id = validated_data.pop('nouveau_fonction_id', None)
+        nouveau_district_id = validated_data.pop('nouveau_district_id', None)
+
+        if nouveau_fonction_id:
+            validated_data['nouveau_fonction'] = Fonction.objects.get(id=nouveau_fonction_id)
+        if nouveau_district_id:
+            validated_data['nouveau_district'] = District.objects.get(id=nouveau_district_id)
+
+        return Affectation.objects.create(**validated_data)
+
+
+class TypeCongeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TypeConge
+        fields = ['id', 'nom', 'description', 'nombre_jours_max', 'created_at', 'updated_at']
+
+class CongeSerializer(serializers.ModelSerializer):
+    employer = EmployerSerializer(read_only=True)
+    employer_id = serializers.UUIDField(write_only=True)
+    type_conge = TypeCongeSerializer(read_only=True)
+    type_conge_id = serializers.UUIDField(write_only=True)
+
+    class Meta:
+        model = Conge
+        fields = [
+            'id',
+            'employer', 'employer_id',
+            'type_conge', 'type_conge_id',
+            'status_conge',
+            'date_creation',
+            'date_debut',
+            'date_fin',
+            'nombre_jours',
+            'motif',
+            'justificatif',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['nombre_jours', 'status_conge', 'created_at', 'updated_at', 'date_creation']
+
+    def validate(self, data):
+        date_debut = data.get('date_debut')
+        date_fin = data.get('date_fin')
+        type_conge_id = data.get('type_conge_id')
+
+        if date_debut and date_fin:
+            if date_debut > date_fin:
+                raise serializers.ValidationError("La date de début ne peut pas être après la date de fin.")
+            if date_debut < timezone.now().date():
+                raise serializers.ValidationError("La date de début ne peut pas être dans le passé.")
+
+        # Vérification nombre de jours avec le type de congé
+        if date_debut and date_fin and type_conge_id:
+            nombre_jours = (date_fin - date_debut).days + 1
+            from .models import TypeConge
+            type_conge = TypeConge.objects.filter(id=type_conge_id).first()
+            if type_conge and nombre_jours > type_conge.nombre_jours_max:
+                raise serializers.ValidationError(
+                    f"Le nombre de jours dépasse le maximum autorisé pour ce type de congé ({type_conge.nombre_jours_max})."
+                )
+
+        return data
+
+    def create(self, validated_data):
+        employer_id = validated_data.pop('employer_id')
+        type_conge_id = validated_data.pop('type_conge_id')
+        employer = Employer.objects.get(id=employer_id)
+        type_conge = TypeConge.objects.get(id=type_conge_id)
+
+        conge = Conge.objects.create(
+            employer=employer,
+            type_conge=type_conge,
+            **validated_data
+        )
+        return conge
 
     def update(self, instance, validated_data):
+        type_conge_id = validated_data.pop('type_conge_id', None)
+        if type_conge_id:
+            from .models import TypeConge
+            instance.type_conge = TypeConge.objects.get(id=type_conge_id)
+
         for attr, value in validated_data.items():
-            if attr.endswith("_id"):
-                setattr(instance, attr.replace("_id", ""), value)
-            else:
-                setattr(instance, attr, value)
+            setattr(instance, attr, value)
         instance.save()
         return instance
 
 
-# ==================== AFFECTATION ====================
+class TypeContratSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TypeContrat
+        fields = '__all__'
 
-class AssignmentSerializer(serializers.ModelSerializer):
-    employee = EmployeeSerializer(read_only=True)
-    employee_id = serializers.UUIDField(write_only=True)
-    new_district = DistrictSerializer(read_only=True)
-    new_district_id = serializers.UUIDField(write_only=True, required=False)
-    new_function = FunctionSerializer(read_only=True)
-    new_function_id = serializers.UUIDField(write_only=True, required=False)
+
+class ContratSerializer(serializers.ModelSerializer):
+    type_contrat = TypeContratSerializer(read_only=True)
+    type_contrat_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    employer = EmployerSerializer(read_only=True)
+    employer_id = serializers.UUIDField(write_only=True)
 
     class Meta:
-        model = Assignment
+        model = Contrat
         fields = [
-            'id', 'employee', 'employee_id', 'assignment_type',
-            'new_district', 'new_district_id', 'new_function', 'new_function_id',
-            'previous_district', 'previous_function',
-            'assignment_date', 'effective_date', 'end_date',
-            'reason', 'notes', 'is_active',
+            'id', 'status_contrat', 'date_debut_contrat', 'date_fin_contrat',
+            'salaire', 'type_contrat', 'type_contrat_id', 'employer',
+            'employer_id', 'created_at', 'updated_at'
+        ]
+
+
+class LocationSerializer(serializers.ModelSerializer):
+    affectation = AffectationSerializer(read_only=True)
+    affectation_id = serializers.UUIDField(write_only=True)
+
+    class Meta:
+        model = Location
+        fields = [
+            'id', 'adresse', 'ville', 'code_postal',
+            'affectation', 'affectation_id', 'created_at', 'updated_at'
+        ]
+
+
+class ElectriciteSerializer(serializers.ModelSerializer):
+    location = LocationSerializer(read_only=True)
+    location_id = serializers.UUIDField(write_only=True)
+
+    class Meta:
+        model = Electricite
+        fields = [
+            'id', 'numero_compteur', 'fournisseur',
+            'location', 'location_id', 'created_at', 'updated_at'
+        ]
+
+
+
+class ModePayementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ModePayement
+        fields = '__all__'
+
+
+class DemandeSerializer(serializers.ModelSerializer):
+    employer = EmployerSerializer(read_only=True)
+    employer_id = serializers.UUIDField(write_only=True)
+
+    class Meta:
+        model = Demande
+        fields = [
+            'id', 'description', 'montant', 'status', 'date_demande',
+            'employer', 'employer_id', 'created_at', 'updated_at'
+        ]
+
+
+class PayementSerializer(serializers.ModelSerializer):
+    mode_payement = ModePayementSerializer(read_only=True)
+    mode_payement_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    demande = DemandeSerializer(read_only=True)
+    demande_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    electricite = ElectriciteSerializer(read_only=True)
+    electricite_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+
+    class Meta:
+        model = Payement
+        fields = [
+            'id', 'montant', 'date_payement', 'status', 'reference',
+            'mode_payement', 'mode_payement_id', 'demande', 'demande_id',
+            'electricite', 'electricite_id',
             'created_at', 'updated_at'
         ]
 
 
-# ==================== CV ====================
-
-class CVSerializer(serializers.ModelSerializer):
-    employee = EmployeeSerializer(read_only=True)
-    employee_id = serializers.UUIDField(write_only=True)
-
+class TypeAchatSerializer(serializers.ModelSerializer):
     class Meta:
-        model = CV
-        fields = [
-            'id', 'employee', 'employee_id', 'file',
-            'file_name', 'file_size', 'version',
-            'is_current', 'status', 'validated_by',
-            'validated_at', 'validation_notes',
-            'uploaded_at', 'uploaded_by'
-        ]
-        read_only_fields = ['file_name', 'file_size', 'uploaded_at']
-
-    def create(self, validated_data):
-        cv = super().create(validated_data)
-        if cv.is_current:
-            CV.objects.filter(employee=cv.employee, is_current=True).exclude(id=cv.id).update(is_current=False)
-        return cv
-
-
-# ==================== CONGÉS ====================
-
-class LeaveTypeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = LeaveType
+        model = TypeAchat
         fields = '__all__'
 
 
-class LeaveRequestSerializer(serializers.ModelSerializer):
-    employee = EmployeeSerializer(read_only=True)
-    employee_id = serializers.UUIDField(write_only=True)
-    leave_type = LeaveTypeSerializer(read_only=True)
-    leave_type_id = serializers.UUIDField(write_only=True)
+class AchatSerializer(serializers.ModelSerializer):
+    type_achat = TypeAchatSerializer(read_only=True)
+    type_achat_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
 
     class Meta:
-        model = LeaveRequest
+        model = Achat
         fields = [
-            'id', 'employee', 'employee_id', 'leave_type', 'leave_type_id',
-            'start_date', 'end_date', 'number_of_days',
-            'reason', 'status', 'approved_by', 'approved_at',
-            'rejection_reason', 'created_at', 'updated_at'
+            'id', 'article', 'code_achat', 'nombre', 'montant', 'date_achat',
+            'type_achat', 'type_achat_id', 'created_at', 'updated_at'
         ]
-
-
-# ==================== BULLETIN DE PAIE ====================
-
-class PayslipSerializer(serializers.ModelSerializer):
-    employee = EmployeeSerializer(read_only=True)
-    employee_id = serializers.UUIDField(write_only=True)
-
-    class Meta:
-        model = Payslip
-        fields = [
-            'id', 'employee', 'employee_id', 'month', 'year', 'file',
-            'gross_salary', 'deductions', 'net_salary', 'bonus',
-            'overtime_hours', 'overtime_amount', 'status',
-            'validated_by', 'validated_at', 'payment_date',
-            'payment_method', 'notes', 'created_at', 'updated_at'
-        ]
-
-
-# ==================== DEMANDE DE PAIEMENT ====================
-
-class PaymentRequestSerializer(serializers.ModelSerializer):
-    employee = EmployeeSerializer(read_only=True)
-    employee_id = serializers.UUIDField(write_only=True, required=False)
-    created_by = serializers.SerializerMethodField()
-
-    class Meta:
-        model = PaymentRequest
-        fields = [
-            'id', 'employee', 'employee_id', 'created_by',
-            'payment_type', 'amount', 'currency', 'description', 'reference',
-            'supporting_documents', 'status', 'reviewed_by', 'reviewed_at',
-            'approved_by', 'approved_at', 'rejected_reason',
-            'payment_date', 'notes', 'created_at', 'updated_at'
-        ]
-
-    def get_created_by(self, obj):
-        if hasattr(obj, "created_by") and obj.created_by:
-            return {
-                "id": getattr(obj.created_by, "id", None),
-                "username": getattr(obj.created_by, "username", None)
-            }
-        return None

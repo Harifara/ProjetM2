@@ -8,7 +8,6 @@ from .models import User, AuditLog
 # ==========================================================
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    """Configuration de l’affichage du modèle User dans l’admin Django."""
     list_display = ['short_id', 'username', 'email', 'full_name', 'role', 'is_active', 'created_at']
     list_filter = ['role', 'is_active', 'created_at']
     search_fields = ['username', 'email', 'full_name']

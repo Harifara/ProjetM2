@@ -3,35 +3,33 @@
 # ==========================
 FROM python:3.11-slim
 
-# Set working directory
 WORKDIR /app
 
-# Prevent Python from writing pyc files
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Install system dependencies (lightweight)
+# Installer les dépendances système
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        libpq-dev gcc netcat-traditional \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip, setuptools, wheel
+# Mettre à jour pip, setuptools et wheel
 RUN pip install --upgrade pip setuptools wheel
 
-# Copy only requirements first to leverage Docker cache
+# Copier requirements et installer les dépendances Python
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project code
+# Copier le reste du code
 COPY . .
 
-# Entrypoint script
+# Rendre le script d'entrée exécutable
 RUN chmod +x /app/entrypoint.sh
 
-# Default port for Django
+# Exposer le port
 EXPOSE 8000
 
-# Entrypoint
-CMD ["sh", "-c", "./entrypoint.sh"]
+# ⚡ ENTRYPOINT pour lancer le script
+ENTRYPOINT ["/app/entrypoint.sh"]
