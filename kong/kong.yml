@@ -40,6 +40,7 @@ services:
         config:
           minute: 100
           policy: local
+  
 
 # --- RH SERVICE ---
   - name: rh-service
@@ -142,3 +143,4 @@ plugins:
     config:
       header_name: X-Correlation-ID
       echo_downstream: true
+  
