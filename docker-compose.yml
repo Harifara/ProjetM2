@@ -18,8 +18,9 @@ services:
       KONG_LOG_LEVEL: notice
       KONG_PLUGINS: bundled,correlation-id
     volumes:
-      - ./kong/kong.yml:/kong/kong.yml:ro
       - ./kong/ssl:/etc/kong/ssl
+      - ./kong/kong.yml:/kong/kong.yml
+      
     ports:
       - "443:8443"
       - "127.0.0.1:8001:8001"
