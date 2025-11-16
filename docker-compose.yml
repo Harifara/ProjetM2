@@ -1,5 +1,10 @@
+version: "3.9"
 
 services:
+
+  # ============================
+  # KONG (API GATEWAY)
+  # ============================
   kong:
     image: kong:3.4
     container_name: kong
@@ -7,17 +12,17 @@ services:
       KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /kong/kong.yml
       KONG_PROXY_LISTEN: 0.0.0.0:8443 ssl
-      KONG_SSL_CERT: /kong/ssl/cert.pem
-      KONG_SSL_CERT_KEY: /kong/ssl/key.pem
+      KONG_SSL_CERT: /etc/kong/ssl/cert.pem
+      KONG_SSL_CERT_KEY: /etc/kong/ssl/key.pem
       KONG_ADMIN_LISTEN: 0.0.0.0:8001
-      KONG_LOG_LEVEL: debug
+      KONG_LOG_LEVEL: notice
       KONG_PLUGINS: bundled,correlation-id
     volumes:
       - ./kong/kong.yml:/kong/kong.yml:ro
-      - ./kong/ssl:/kong/ssl:ro    # <--- ajouter ce volume
+      - ./kong/ssl:/etc/kong/ssl
     ports:
-      - "443:8443"   # HTTPS public
-      - "127.0.0.1:8001:8001" 
+      - "443:8443"
+      - "127.0.0.1:8001:8001"
     depends_on:
       - auth_service
       - rh_service
@@ -27,13 +32,15 @@ services:
     networks:
       - project_network
 
+  # ============================
+  # AUTH SERVICE
+  # ============================
   auth_service:
     build: ./auth_service
     container_name: auth_service
-    env_file:
-      - ./auth_service/.env
-    ports:
-      - "8000:8000"
+    env_file: ./auth_service/.env
+    expose:
+      - "8000"
     restart: unless-stopped
     networks:
       - project_network
@@ -41,10 +48,9 @@ services:
   rh_service:
     build: ./rh_service
     container_name: rh_service
-    env_file:
-      - ./rh_service/.env
-    ports:
-      - "8002:8000"
+    env_file: ./rh_service/.env
+    expose:
+      - "8000"
     restart: unless-stopped
     networks:
       - project_network
@@ -52,10 +58,9 @@ services:
   stock_service:
     build: ./stock_service
     container_name: stock_service
-    env_file:
-      - ./stock_service/.env
-    ports:
-      - "8003:8000"
+    env_file: ./stock_service/.env
+    expose:
+      - "8000"
     restart: unless-stopped
     networks:
       - project_network
@@ -63,10 +68,9 @@ services:
   finance_service:
     build: ./finance_service
     container_name: finance_service
-    env_file:
-      - ./finance_service/.env
-    ports:
-      - "8004:8000"
+    env_file: ./finance_service/.env
+    expose:
+      - "8000"
     restart: unless-stopped
     networks:
       - project_network
@@ -74,14 +78,16 @@ services:
   cordo_service:
     build: ./cordo_service
     container_name: cordo_service
-    env_file:
-      - ./cordo_service/.env
-    ports:
-      - "8005:8000"
+    env_file: ./cordo_service/.env
+    expose:
+      - "8000"
     restart: unless-stopped
     networks:
       - project_network
 
+# ============================
+# NETWORK
+# ============================
 networks:
   project_network:
     driver: bridge

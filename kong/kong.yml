@@ -1,9 +1,9 @@
 _format_version: "3.0"
 _transform: true
 
-# =====================
-# 🔐 CONSUMERS (JWT)
-# =====================
+# ============================
+# 🔐 CONSUMER (JWT)
+# ============================
 consumers:
   - username: auth-service
     custom_id: "auth-service"
@@ -13,43 +13,62 @@ consumers:
         key: auth-service
         secret: my_super_secret_key_123
 
-# =====================
-# 🚪 SERVICES
-# =====================
+# ============================
+# 🌍 CORS SHARED CONFIG
+# ============================
+x-cors-config: &cors_config
+  origins:
+    - "https://ecartmada.com"
+    - "https://www.ecartmada.com"
+    - "https://51.21.42.34"
+    - "http://localhost:5173"
+  methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
+  headers: ["Authorization","Content-Type","Accept","Origin"]
+  exposed_headers: ["Authorization","X-Auth-Token"]
+  credentials: true
+  max_age: 3600
 
-# --- AUTH SERVICE ---
+# ============================
+# 🚪 SERVICES
+# ============================
 services:
+
+  # -------------------------
+  # AUTH SERVICE
+  # -------------------------
   - name: auth-service
     url: http://auth_service:8000
     routes:
       - name: auth-route
         paths: ["/api/auth"]
-        strip_path: false
         preserve_host: true
-        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
+        strip_path: false
+        hosts:
+          - ecartmada.com
+          - www.ecartmada.com
+          - 51.21.42.34
     plugins:
       - name: cors
-        config:
-          origins: ["https://ecartmada.com"]
-          methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
-          headers: ["Accept","Authorization","Content-Type","Origin"]
-          exposed_headers: ["X-Auth-Token"]
-          credentials: true
-          max_age: 3600
+        config: *cors_config
       - name: rate-limiting
         config:
           minute: 100
           policy: local
-  
 
-# --- RH SERVICE ---
+  # -------------------------
+  # RH SERVICE
+  # -------------------------
   - name: rh-service
     url: http://rh_service:8000
     routes:
       - name: rh-route
         paths: ["/api/rh"]
-        strip_path: false
         preserve_host: true
+        strip_path: false
+        hosts:
+          - ecartmada.com
+          - www.ecartmada.com
+          - 51.21.42.34
     plugins:
       - name: jwt
         config:
@@ -57,22 +76,22 @@ services:
           key_claim_name: iss
           claims_to_verify: [exp]
       - name: cors
-        config:
-          origins: ["https://ecartmada.com"]
-          methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
-          headers: ["Authorization","Content-Type","Accept"]
-          exposed_headers: ["Authorization"]
-          credentials: true
-          max_age: 3600
+        config: *cors_config
 
-# --- STOCK SERVICE ---
+  # -------------------------
+  # STOCK SERVICE
+  # -------------------------
   - name: stock-service
     url: http://stock_service:8000
     routes:
       - name: stock-route
         paths: ["/api/stock"]
-        strip_path: false
         preserve_host: true
+        strip_path: false
+        hosts:
+          - ecartmada.com
+          - www.ecartmada.com
+          - 51.21.42.34
     plugins:
       - name: jwt
         config:
@@ -80,22 +99,22 @@ services:
           key_claim_name: iss
           claims_to_verify: [exp]
       - name: cors
-        config:
-          origins: ["https://ecartmada.com"]
-          methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
-          headers: ["Authorization","Content-Type","Accept"]
-          exposed_headers: ["Authorization"]
-          credentials: true
-          max_age: 3600
+        config: *cors_config
 
-# --- FINANCE SERVICE ---
+  # -------------------------
+  # FINANCE SERVICE
+  # -------------------------
   - name: finance-service
     url: http://finance_service:8000
     routes:
       - name: finance-route
         paths: ["/api/finance"]
-        strip_path: false
         preserve_host: true
+        strip_path: false
+        hosts:
+          - ecartmada.com
+          - www.ecartmada.com
+          - 51.21.42.34
     plugins:
       - name: jwt
         config:
@@ -103,22 +122,22 @@ services:
           key_claim_name: iss
           claims_to_verify: [exp]
       - name: cors
-        config:
-          origins: ["https://ecartmada.com"]
-          methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
-          headers: ["Authorization","Content-Type","Accept"]
-          exposed_headers: ["Authorization"]
-          credentials: true
-          max_age: 3600
+        config: *cors_config
 
-# --- CORDO SERVICE ---
+  # -------------------------
+  # CORDO SERVICE
+  # -------------------------
   - name: cordo-service
     url: http://cordo_service:8000
     routes:
       - name: cordo-route
         paths: ["/api/cordo"]
-        strip_path: false
         preserve_host: true
+        strip_path: false
+        hosts:
+          - ecartmada.com
+          - www.ecartmada.com
+          - 51.21.42.34
     plugins:
       - name: jwt
         config:
@@ -126,21 +145,14 @@ services:
           key_claim_name: iss
           claims_to_verify: [exp]
       - name: cors
-        config:
-          origins: ["https://ecartmada.com"]
-          methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
-          headers: ["Authorization","Content-Type","Accept"]
-          exposed_headers: ["Authorization"]
-          credentials: true
-          max_age: 3600
+        config: *cors_config
 
-# =====================
-# 🌡️ PLUGINS GLOBAUX
-# =====================
+# ============================
+# 🌡 GLOBAL PLUGINS
+# ============================
 plugins:
   - name: prometheus
   - name: correlation-id
     config:
       header_name: X-Correlation-ID
       echo_downstream: true
-  
