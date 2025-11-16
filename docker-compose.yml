@@ -18,6 +18,7 @@ services:
     ports:
       - "443:8443"   # HTTPS public
       - "80:8000"    # HTTP public (optionnel)
+      - "127.0.0.1:8001:8001" 
     depends_on:
       - auth_service
       - rh_service
