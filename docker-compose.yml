@@ -16,7 +16,7 @@ services:
       - ./kong/kong.yml:/kong/kong.yml:ro
       - ./kong/ssl:/kong/ssl:ro    # <--- ajouter ce volume
     ports:
-      - "443:8443"   # HTTPS public
+      - "8443:8443"   # HTTPS public
       - "80:8000"    # HTTP public (optionnel)
       - "127.0.0.1:8001:8001" 
     depends_on:
