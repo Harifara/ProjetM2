@@ -8,25 +8,10 @@ consumers:
   - username: auth-service
     custom_id: "auth-service"
     jwt_secrets:
-      - consumer: auth-service
+      - consumer: null
         algorithm: HS256
         key: auth-service
         secret: my_super_secret_key_123
-
-# ============================
-# 🌍 CORS SHARED CONFIG
-# ============================
-x-cors-config: &cors_config
-  origins:
-    - "https://ecartmada.com"
-    - "https://www.ecartmada.com"
-    - "https://51.21.42.34"
-    - "http://localhost:5173"
-  methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
-  headers: ["Authorization","Content-Type","Accept","Origin"]
-  exposed_headers: ["Authorization","X-Auth-Token"]
-  credentials: true
-  max_age: 3600
 
 # ============================
 # 🚪 SERVICES
@@ -49,7 +34,17 @@ services:
           - 51.21.42.34
     plugins:
       - name: cors
-        config: *cors_config
+        config:
+          origins:
+            - "https://ecartmada.com"
+            - "https://www.ecartmada.com"
+            - "https://51.21.42.34"
+            - "http://localhost:5173"
+          methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
+          headers: ["Authorization","Content-Type","Accept","Origin"]
+          exposed_headers: ["Authorization","X-Auth-Token"]
+          credentials: true
+          max_age: 3600
       - name: rate-limiting
         config:
           minute: 100
@@ -76,7 +71,17 @@ services:
           key_claim_name: iss
           claims_to_verify: [exp]
       - name: cors
-        config: *cors_config
+        config:
+          origins:
+            - "https://ecartmada.com"
+            - "https://www.ecartmada.com"
+            - "https://51.21.42.34"
+            - "http://localhost:5173"
+          methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
+          headers: ["Authorization","Content-Type","Accept","Origin"]
+          exposed_headers: ["Authorization","X-Auth-Token"]
+          credentials: true
+          max_age: 3600
 
   # -------------------------
   # STOCK SERVICE
@@ -99,7 +104,17 @@ services:
           key_claim_name: iss
           claims_to_verify: [exp]
       - name: cors
-        config: *cors_config
+        config:
+          origins:
+            - "https://ecartmada.com"
+            - "https://www.ecartmada.com"
+            - "https://51.21.42.34"
+            - "http://localhost:5173"
+          methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
+          headers: ["Authorization","Content-Type","Accept","Origin"]
+          exposed_headers: ["Authorization","X-Auth-Token"]
+          credentials: true
+          max_age: 3600
 
   # -------------------------
   # FINANCE SERVICE
@@ -122,7 +137,17 @@ services:
           key_claim_name: iss
           claims_to_verify: [exp]
       - name: cors
-        config: *cors_config
+        config:
+          origins:
+            - "https://ecartmada.com"
+            - "https://www.ecartmada.com"
+            - "https://51.21.42.34"
+            - "http://localhost:5173"
+          methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
+          headers: ["Authorization","Content-Type","Accept","Origin"]
+          exposed_headers: ["Authorization","X-Auth-Token"]
+          credentials: true
+          max_age: 3600
 
   # -------------------------
   # CORDO SERVICE
@@ -145,7 +170,17 @@ services:
           key_claim_name: iss
           claims_to_verify: [exp]
       - name: cors
-        config: *cors_config
+        config:
+          origins:
+            - "https://ecartmada.com"
+            - "https://www.ecartmada.com"
+            - "https://51.21.42.34"
+            - "http://localhost:5173"
+          methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
+          headers: ["Authorization","Content-Type","Accept","Origin"]
+          exposed_headers: ["Authorization","X-Auth-Token"]
+          credentials: true
+          max_age: 3600
 
 # ============================
 # 🌡 GLOBAL PLUGINS
