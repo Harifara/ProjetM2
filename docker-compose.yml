@@ -17,7 +17,7 @@ services:
       - ./kong/ssl:/kong/ssl:ro    # <--- ajouter ce volume
     ports:
       - "443:8443"   # HTTPS public
-      - "8080:8000"    # HTTP public (optionnel)
+      - "80:8000"    # HTTP public (optionnel)
       - "8001:8001"  # Admin (attention prod)
     depends_on:
       - auth_service
