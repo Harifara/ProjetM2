@@ -18,7 +18,6 @@ services:
     ports:
       - "443:8443"   # HTTPS public
       - "80:8000"    # HTTP public (optionnel)
-      - "8001:8001"  # Admin (attention prod)
     depends_on:
       - auth_service
       - rh_service
