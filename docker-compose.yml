@@ -15,7 +15,7 @@ services:
       - ./kong/kong.yml:/kong/kong.yml:ro
       #- ./kong/ssl:/kong/ssl:ro  # <--- volume SSL commenté
     ports:
-      - "8000:8000"   # HTTP public
+      - "8080:8000"   # HTTP public
       - "127.0.0.1:8001:8001"  # Admin
     depends_on:
       - auth_service
