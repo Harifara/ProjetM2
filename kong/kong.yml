@@ -27,7 +27,7 @@ services:
       - name: auth-route
         paths: ["/api/auth"]
         preserve_host: true
-        strip_path: false
+        strip_path: true
         hosts:
           - ecartmada.com
           - www.ecartmada.com
