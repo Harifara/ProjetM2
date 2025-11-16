@@ -2,7 +2,7 @@ _format_version: "3.0"
 _transform: true
 
 # ============================
-# 🔐 CONSUMER (JWT)
+# 🔐 CONSUMERS (JWT)
 # ============================
 consumers:
   - username: auth-service
@@ -14,13 +14,13 @@ consumers:
         secret: my_super_secret_key_123
 
 # ============================
-# 🚪 SERVICES
+# 🚪 SERVICES + ROUTES
 # ============================
 services:
 
-  # -------------------------
+  # ---------------------------
   # AUTH SERVICE
-  # -------------------------
+  # ---------------------------
   - name: auth-service
     url: http://auth_service:8000
     routes:
@@ -50,9 +50,9 @@ services:
           minute: 100
           policy: local
 
-  # -------------------------
+  # ---------------------------
   # RH SERVICE
-  # -------------------------
+  # ---------------------------
   - name: rh-service
     url: http://rh_service:8000
     routes:
@@ -83,9 +83,9 @@ services:
           credentials: true
           max_age: 3600
 
-  # -------------------------
+  # ---------------------------
   # STOCK SERVICE
-  # -------------------------
+  # ---------------------------
   - name: stock-service
     url: http://stock_service:8000
     routes:
@@ -116,9 +116,9 @@ services:
           credentials: true
           max_age: 3600
 
-  # -------------------------
+  # ---------------------------
   # FINANCE SERVICE
-  # -------------------------
+  # ---------------------------
   - name: finance-service
     url: http://finance_service:8000
     routes:
@@ -149,9 +149,9 @@ services:
           credentials: true
           max_age: 3600
 
-  # -------------------------
+  # ---------------------------
   # CORDO SERVICE
-  # -------------------------
+  # ---------------------------
   - name: cordo-service
     url: http://cordo_service:8000
     routes:

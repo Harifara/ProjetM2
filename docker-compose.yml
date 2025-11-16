@@ -45,6 +45,9 @@ services:
     networks:
       - project_network
 
+  # ============================
+  # RH SERVICE
+  # ============================
   rh_service:
     build: ./rh_service
     container_name: rh_service
@@ -55,6 +58,9 @@ services:
     networks:
       - project_network
 
+  # ============================
+  # STOCK SERVICE
+  # ============================
   stock_service:
     build: ./stock_service
     container_name: stock_service
@@ -65,6 +71,9 @@ services:
     networks:
       - project_network
 
+  # ============================
+  # FINANCE SERVICE
+  # ============================
   finance_service:
     build: ./finance_service
     container_name: finance_service
@@ -75,6 +84,9 @@ services:
     networks:
       - project_network
 
+  # ============================
+  # CORDO SERVICE
+  # ============================
   cordo_service:
     build: ./cordo_service
     container_name: cordo_service
