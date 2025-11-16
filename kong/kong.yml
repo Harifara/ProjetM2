@@ -8,8 +8,7 @@ consumers:
   - username: auth-service
     custom_id: "auth-service"
     jwt_secrets:
-      - consumer: null
-        algorithm: HS256
+      - algorithm: HS256
         key: auth-service
         secret: my_super_secret_key_123
 
@@ -26,8 +25,7 @@ services:
     routes:
       - name: auth-route
         paths: ["/api/auth"]
-        preserve_host: true
-        strip_path: true
+        strip_path: false
         hosts:
           - ecartmada.com
           - www.ecartmada.com
@@ -36,10 +34,7 @@ services:
       - name: cors
         config:
           origins:
-            - "https://ecartmada.com"
-            - "https://www.ecartmada.com"
-            - "https://51.21.42.34"
-            - "http://localhost:5173"
+            - "*"
           methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
           headers: ["Authorization","Content-Type","Accept","Origin"]
           exposed_headers: ["Authorization","X-Auth-Token"]
@@ -58,7 +53,6 @@ services:
     routes:
       - name: rh-route
         paths: ["/api/rh"]
-        preserve_host: true
         strip_path: false
         hosts:
           - ecartmada.com
@@ -67,21 +61,15 @@ services:
     plugins:
       - name: jwt
         config:
-          secret_is_base64: false
           key_claim_name: iss
-          claims_to_verify: [exp]
+          claims_to_verify: ["exp"]
       - name: cors
         config:
-          origins:
-            - "https://ecartmada.com"
-            - "https://www.ecartmada.com"
-            - "https://51.21.42.34"
-            - "http://localhost:5173"
+          origins: ["*"]
           methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
           headers: ["Authorization","Content-Type","Accept","Origin"]
           exposed_headers: ["Authorization","X-Auth-Token"]
           credentials: true
-          max_age: 3600
 
   # ---------------------------
   # STOCK SERVICE
@@ -91,7 +79,6 @@ services:
     routes:
       - name: stock-route
         paths: ["/api/stock"]
-        preserve_host: true
         strip_path: false
         hosts:
           - ecartmada.com
@@ -100,21 +87,15 @@ services:
     plugins:
       - name: jwt
         config:
-          secret_is_base64: false
           key_claim_name: iss
-          claims_to_verify: [exp]
+          claims_to_verify: ["exp"]
       - name: cors
         config:
-          origins:
-            - "https://ecartmada.com"
-            - "https://www.ecartmada.com"
-            - "https://51.21.42.34"
-            - "http://localhost:5173"
+          origins: ["*"]
           methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
           headers: ["Authorization","Content-Type","Accept","Origin"]
           exposed_headers: ["Authorization","X-Auth-Token"]
           credentials: true
-          max_age: 3600
 
   # ---------------------------
   # FINANCE SERVICE
@@ -124,7 +105,6 @@ services:
     routes:
       - name: finance-route
         paths: ["/api/finance"]
-        preserve_host: true
         strip_path: false
         hosts:
           - ecartmada.com
@@ -133,21 +113,15 @@ services:
     plugins:
       - name: jwt
         config:
-          secret_is_base64: false
           key_claim_name: iss
-          claims_to_verify: [exp]
+          claims_to_verify: ["exp"]
       - name: cors
         config:
-          origins:
-            - "https://ecartmada.com"
-            - "https://www.ecartmada.com"
-            - "https://51.21.42.34"
-            - "http://localhost:5173"
+          origins: ["*"]
           methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
           headers: ["Authorization","Content-Type","Accept","Origin"]
           exposed_headers: ["Authorization","X-Auth-Token"]
           credentials: true
-          max_age: 3600
 
   # ---------------------------
   # CORDO SERVICE
@@ -157,7 +131,6 @@ services:
     routes:
       - name: cordo-route
         paths: ["/api/cordo"]
-        preserve_host: true
         strip_path: false
         hosts:
           - ecartmada.com
@@ -166,21 +139,15 @@ services:
     plugins:
       - name: jwt
         config:
-          secret_is_base64: false
           key_claim_name: iss
-          claims_to_verify: [exp]
+          claims_to_verify: ["exp"]
       - name: cors
         config:
-          origins:
-            - "https://ecartmada.com"
-            - "https://www.ecartmada.com"
-            - "https://51.21.42.34"
-            - "http://localhost:5173"
+          origins: ["*"]
           methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
           headers: ["Authorization","Content-Type","Accept","Origin"]
           exposed_headers: ["Authorization","X-Auth-Token"]
           credentials: true
-          max_age: 3600
 
 # ============================
 # 🌡 GLOBAL PLUGINS
