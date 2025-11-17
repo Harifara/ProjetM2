@@ -26,6 +26,7 @@ services:
       - "8443:8443"   # HTTPS interne Kong (proxy)
       - "80:8000"     # HTTP public
       - "443:8443" 
+      - "8001:8001"
 
     depends_on:
       - auth_service
