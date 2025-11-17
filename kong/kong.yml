@@ -24,9 +24,10 @@ services:
     url: http://auth_service:8000
     routes:
       - name: auth-route
-        paths: 
+        paths:
           - /api/auth
-        strip_path: false
+        strip_path: true
+
         protocols: ["http", "https"]
         hosts:
           - api.ecartmada.com
