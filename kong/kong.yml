@@ -24,8 +24,7 @@ services:
     url: http://auth_service:8000
     routes:
       - name: auth-route
-        paths:
-          - /api/auth
+        paths: ["/api/auth"]
         strip_path: true
 
         protocols: ["http", "https"]
