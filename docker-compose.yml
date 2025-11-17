@@ -19,7 +19,8 @@ services:
     volumes:
       - ./kong/kong.yml:/kong/kong.yml
     ports:
-      - "8000:8000"         # HTTP interne
+      - "80:8000"    # HTTP
+      - "443:8443"   # HTTPS si tu gères SSL
       - "127.0.0.1:8001:8001"  # Admin API
     depends_on:
       - auth_service
