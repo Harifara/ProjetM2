@@ -32,6 +32,9 @@ services:
         hosts:
           - api.ecartmada.com
           - ecartmada.com
+          - localhost
+          - 127.0.0.1
+
     plugins:
       - name: cors
         config:
