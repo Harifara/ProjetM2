@@ -21,6 +21,7 @@ services:
   # AUTH SERVICE
   # ---------------------------
   - name: auth-service
+    url: http://auth_service:8000
     routes:
       - name: auth-route
         paths: ["/api/auth"]
