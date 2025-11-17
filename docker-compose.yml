@@ -41,8 +41,8 @@ services:
     build: ./auth_service
     container_name: auth_service
     env_file: ./auth_service/.env
-    expose:
-      - "8000"   # accessible uniquement depuis le réseau interne
+    ports:
+    - "8000:8000"    # accessible uniquement depuis le réseau interne
     restart: unless-stopped
     networks:
       - project_network
