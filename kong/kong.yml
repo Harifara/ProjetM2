@@ -25,7 +25,7 @@ services:
     routes:
       - name: auth-route
         paths:
-          - /api/auth/
+          - /api/auth
         strip_path: false
 
         protocols: ["http", "https"]
