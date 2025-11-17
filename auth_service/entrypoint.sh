@@ -8,14 +8,14 @@ while ! nc -z $DB_HOST $DB_PORT; do
 done
 echo "✅ Database is up!"
 
-echo "📦 Making migrations for authentication..."
-python manage.py makemigrations authentication --noinput
-
-echo "📦 Applying all migrations..."
+echo "📦 Applying database migrations..."
 python manage.py migrate --noinput
 
 echo "⚙️ Collecting static files..."
 python manage.py collectstatic --noinput
 
-echo "🚀 Starting Django server..."
-python manage.py runserver 0.0.0.0:8000
+echo "🚀 Starting Gunicorn server..."
+exec gunicorn auth_service.wsgi:application \
+    --bind 0.0.0.0:8000 \
+    --workers 4 \
+    --timeout 120
