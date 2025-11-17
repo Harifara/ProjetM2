@@ -22,9 +22,9 @@ services:
       - ./kong/ssl:/etc/kong/ssl
       - ./kong/kong.yml:/kong/kong.yml
     ports:
-      - "80:8000"
-      - "443:8443"
-      - "127.0.0.1:8001:8001"
+      - "80:8000"      # HTTP
+      - "443:8443"     # HTTPS
+      - "127.0.0.1:8001:8001"  # Admin API, accessible uniquement localement
     depends_on:
       - auth_service
       - rh_service
@@ -41,8 +41,8 @@ services:
     build: ./auth_service
     container_name: auth_service
     env_file: ./auth_service/.env
-    ports:       # <-- Publie sur l’hôte pour tests directs
-      - "8000:8000"
+    expose:
+      - "8000"   # accessible uniquement depuis le réseau interne
     restart: unless-stopped
     networks:
       - project_network
@@ -54,8 +54,8 @@ services:
     build: ./rh_service
     container_name: rh_service
     env_file: ./rh_service/.env
-    ports:
-      - "8001:8000"
+    expose:
+      - "8000"
     restart: unless-stopped
     networks:
       - project_network
@@ -67,8 +67,8 @@ services:
     build: ./stock_service
     container_name: stock_service
     env_file: ./stock_service/.env
-    ports:
-      - "8002:8000"
+    expose:
+      - "8000"
     restart: unless-stopped
     networks:
       - project_network
@@ -80,8 +80,8 @@ services:
     build: ./finance_service
     container_name: finance_service
     env_file: ./finance_service/.env
-    ports:
-      - "8003:8000"
+    expose:
+      - "8000"
     restart: unless-stopped
     networks:
       - project_network
@@ -93,8 +93,8 @@ services:
     build: ./cordo_service
     container_name: cordo_service
     env_file: ./cordo_service/.env
-    ports:
-      - "8004:8000"
+    expose:
+      - "8000"
     restart: unless-stopped
     networks:
       - project_network
