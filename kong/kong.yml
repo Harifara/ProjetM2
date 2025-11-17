@@ -174,10 +174,6 @@ services:
           key_claim_name: iss
           claims_to_verify: ["exp"]
 
-ssl:
-  enabled: true
-  cert: /home/ubuntu/ProjetM2/kong/ssl/fullchain.pem
-  key: /home/ubuntu/ProjetM2/kong/ssl/privkey.pem
 # ============================
 # 🌡 GLOBAL PLUGINS
 # ============================
