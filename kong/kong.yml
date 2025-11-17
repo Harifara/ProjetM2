@@ -57,7 +57,7 @@ services:
     routes:
       - name: rh-route
         paths: ["/api/rh"]
-        strip_path: true
+        strip_path: false
         protocols: ["http", "https"]
         hosts:
           - api.ecartmada.com
@@ -88,7 +88,7 @@ services:
     routes:
       - name: stock-route
         paths: ["/api/stock"]
-        strip_path: true
+        strip_path: false
         protocols: ["http", "https"]
         hosts:
           - api.ecartmada.com
@@ -119,7 +119,7 @@ services:
     routes:
       - name: finance-route
         paths: ["/api/finance"]
-        strip_path: true
+        strip_path: false
         protocols: ["http", "https"]
         hosts:
           - api.ecartmada.com
@@ -150,7 +150,7 @@ services:
     routes:
       - name: cordo-route
         paths: ["/api/cordo"]
-        strip_path: true
+        strip_path: false
         protocols: ["http", "https"]
         hosts:
           - api.ecartmada.com
