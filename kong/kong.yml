@@ -23,7 +23,7 @@ services:
   - name: auth-service
     routes:
       - name: auth-route
-        paths: ["/api/auth/"]
+        paths: ["/api/auth"]
         strip_path: false
         protocols: ["http", "https"]
         hosts:
