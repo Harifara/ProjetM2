@@ -113,6 +113,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
 # 🔹 Authentification principale
 # ==========================
 class AuthViewSet(viewsets.GenericViewSet):
+    authentication_classes = []
     permission_classes = [AllowAny]
     serializer_class = LoginSerializer
     parser_classes = [JSONParser, FormParser, MultiPartParser]
