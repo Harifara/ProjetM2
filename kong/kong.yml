@@ -58,10 +58,10 @@ services:
       - name: rh-route
         paths: ["/api/rh"]
         strip_path: false
+        preserve_host: true
         protocols: ["http", "https"]
         hosts:
           - api.ecartmada.com
-          - ecartmada.com
     plugins:
       - name: cors
         config:
@@ -89,10 +89,10 @@ services:
       - name: stock-route
         paths: ["/api/stock"]
         strip_path: false
+        preserve_host: true
         protocols: ["http", "https"]
         hosts:
           - api.ecartmada.com
-          - ecartmada.com
     plugins:
       - name: cors
         config:
@@ -120,10 +120,10 @@ services:
       - name: finance-route
         paths: ["/api/finance"]
         strip_path: false
+        preserve_host: true
         protocols: ["http", "https"]
         hosts:
           - api.ecartmada.com
-          - ecartmada.com
     plugins:
       - name: cors
         config:
@@ -151,10 +151,10 @@ services:
       - name: cordo-route
         paths: ["/api/cordo"]
         strip_path: false
+        preserve_host: true
         protocols: ["http", "https"]
         hosts:
           - api.ecartmada.com
-          - ecartmada.com
     plugins:
       - name: cors
         config:
