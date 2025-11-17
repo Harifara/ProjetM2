@@ -18,6 +18,7 @@ services:
       KONG_TRUSTED_IPS: 0.0.0.0/0,::/0
     volumes:
       - ./kong/kong.yml:/kong/kong.yml
+      - /etc/letsencrypt/live/api.ecartmada.com:/etc/letsencrypt/live/api.ecartmada.com:ro
     ports:
       - "80:8000"    # HTTP
       - "443:8443"   # HTTPS si tu gères SSL

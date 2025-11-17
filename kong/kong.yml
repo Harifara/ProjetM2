@@ -22,10 +22,6 @@ services:
   # ---------------------------
   - name: auth-service
     url: http://auth_service:8000
-    ssl:
-      enabled: true
-      cert: /etc/letsencrypt/live/api.ecartmada.com/fullchain.pem
-      key: /etc/letsencrypt/live/api.ecartmada.com/privkey.pem
     routes:
       - name: auth-route
         paths:
@@ -178,6 +174,10 @@ services:
           key_claim_name: iss
           claims_to_verify: ["exp"]
 
+ssl:
+  enabled: true
+  cert: /home/ubuntu/ProjetM2/kong/ssl/fullchain.pem
+  key: /home/ubuntu/ProjetM2/kong/ssl/privkey.pem
 # ============================
 # 🌡 GLOBAL PLUGINS
 # ============================
