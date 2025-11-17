@@ -26,10 +26,11 @@ services:
       - name: auth-route
         paths:
           - /api/auth
-        strip_path: false
+        strip_path: true
 
         protocols: ["http", "https"]
         hosts:
+          - api.ecartmada.com
           - ecartmada.com
     plugins:
       - name: cors
