@@ -22,10 +22,10 @@ services:
       - ./kong/kong.yml:/kong/kong.yml
       - ./kong/ssl:/kong/ssl
     ports:
-      - "8000:8000"
-      - "8443:8443"
-      - "8001:8001"
-      - "8444:8444"
+      - "8000:8000"   # HTTP interne Kong (proxy)
+      - "8443:8443"   # HTTPS interne Kong (proxy)
+      - "80:8000"     # HTTP public
+      - "443:8443" 
 
     depends_on:
       - auth_service
