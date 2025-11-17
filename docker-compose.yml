@@ -42,7 +42,7 @@ services:
     container_name: auth_service
     env_file: ./auth_service/.env
     ports:
-    - "8000:8000"    # accessible uniquement depuis le réseau interne
+      - "8000"   # accessible uniquement depuis le réseau interne
     restart: unless-stopped
     networks:
       - project_network
