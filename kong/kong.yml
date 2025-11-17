@@ -21,7 +21,7 @@ services:
   # AUTH SERVICE
   # ---------------------------
   - name: auth-service
-    url: https://api.ecartmada.com
+    url: http://auth_service:8000
     routes:
       - name: auth-route
         paths: ["/api/auth"]
