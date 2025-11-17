@@ -26,20 +26,26 @@ services:
       - name: auth-route
         paths: ["/api/auth"]
         strip_path: false
+        protocols: ["http", "https"]
         hosts:
           - ecartmada.com
           - www.ecartmada.com
+          - api.ecartmada.com
           - 51.21.42.34
     plugins:
       - name: cors
         config:
           origins:
-            - "*"
-          methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
-          headers: ["Authorization","Content-Type","Accept","Origin"]
-          exposed_headers: ["Authorization","X-Auth-Token"]
+            - "https://ecartmada.com"
+            - "https://www.ecartmada.com"
+            - "http://localhost:5173"
+            - "http://localhost:3000"
+          methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"]
+          headers: ["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"]
+          exposed_headers: ["Authorization", "X-Auth-Token"]
           credentials: true
           max_age: 3600
+          preflight_continue: false
       - name: rate-limiting
         config:
           minute: 100
@@ -54,22 +60,30 @@ services:
       - name: rh-route
         paths: ["/api/rh"]
         strip_path: false
+        protocols: ["http", "https"]
         hosts:
           - ecartmada.com
           - www.ecartmada.com
+          - api.ecartmada.com
           - 51.21.42.34
     plugins:
+      - name: cors
+        config:
+          origins:
+            - "https://ecartmada.com"
+            - "https://www.ecartmada.com"
+            - "http://localhost:5173"
+            - "http://localhost:3000"
+          methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"]
+          headers: ["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"]
+          exposed_headers: ["Authorization", "X-Auth-Token"]
+          credentials: true
+          max_age: 3600
+          preflight_continue: false
       - name: jwt
         config:
           key_claim_name: iss
           claims_to_verify: ["exp"]
-      - name: cors
-        config:
-          origins: ["*"]
-          methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
-          headers: ["Authorization","Content-Type","Accept","Origin"]
-          exposed_headers: ["Authorization","X-Auth-Token"]
-          credentials: true
 
   # ---------------------------
   # STOCK SERVICE
@@ -80,22 +94,30 @@ services:
       - name: stock-route
         paths: ["/api/stock"]
         strip_path: false
+        protocols: ["http", "https"]
         hosts:
           - ecartmada.com
           - www.ecartmada.com
+          - api.ecartmada.com
           - 51.21.42.34
     plugins:
+      - name: cors
+        config:
+          origins:
+            - "https://ecartmada.com"
+            - "https://www.ecartmada.com"
+            - "http://localhost:5173"
+            - "http://localhost:3000"
+          methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"]
+          headers: ["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"]
+          exposed_headers: ["Authorization", "X-Auth-Token"]
+          credentials: true
+          max_age: 3600
+          preflight_continue: false
       - name: jwt
         config:
           key_claim_name: iss
           claims_to_verify: ["exp"]
-      - name: cors
-        config:
-          origins: ["*"]
-          methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
-          headers: ["Authorization","Content-Type","Accept","Origin"]
-          exposed_headers: ["Authorization","X-Auth-Token"]
-          credentials: true
 
   # ---------------------------
   # FINANCE SERVICE
@@ -106,22 +128,30 @@ services:
       - name: finance-route
         paths: ["/api/finance"]
         strip_path: false
+        protocols: ["http", "https"]
         hosts:
           - ecartmada.com
           - www.ecartmada.com
+          - api.ecartmada.com
           - 51.21.42.34
     plugins:
+      - name: cors
+        config:
+          origins:
+            - "https://ecartmada.com"
+            - "https://www.ecartmada.com"
+            - "http://localhost:5173"
+            - "http://localhost:3000"
+          methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"]
+          headers: ["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"]
+          exposed_headers: ["Authorization", "X-Auth-Token"]
+          credentials: true
+          max_age: 3600
+          preflight_continue: false
       - name: jwt
         config:
           key_claim_name: iss
           claims_to_verify: ["exp"]
-      - name: cors
-        config:
-          origins: ["*"]
-          methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
-          headers: ["Authorization","Content-Type","Accept","Origin"]
-          exposed_headers: ["Authorization","X-Auth-Token"]
-          credentials: true
 
   # ---------------------------
   # CORDO SERVICE
@@ -132,22 +162,30 @@ services:
       - name: cordo-route
         paths: ["/api/cordo"]
         strip_path: false
+        protocols: ["http", "https"]
         hosts:
           - ecartmada.com
           - www.ecartmada.com
+          - api.ecartmada.com
           - 51.21.42.34
     plugins:
+      - name: cors
+        config:
+          origins:
+            - "https://ecartmada.com"
+            - "https://www.ecartmada.com"
+            - "http://localhost:5173"
+            - "http://localhost:3000"
+          methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"]
+          headers: ["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"]
+          exposed_headers: ["Authorization", "X-Auth-Token"]
+          credentials: true
+          max_age: 3600
+          preflight_continue: false
       - name: jwt
         config:
           key_claim_name: iss
           claims_to_verify: ["exp"]
-      - name: cors
-        config:
-          origins: ["*"]
-          methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
-          headers: ["Authorization","Content-Type","Accept","Origin"]
-          exposed_headers: ["Authorization","X-Auth-Token"]
-          credentials: true
 
 # ============================
 # 🌡 GLOBAL PLUGINS
