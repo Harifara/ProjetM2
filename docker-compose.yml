@@ -22,8 +22,8 @@ services:
       - ./kong/ssl:/etc/kong/ssl
       - ./kong/kong.yml:/kong/kong.yml
     ports:
-      - "80:8000"      # HTTP
-      - "443:8443"     # HTTPS
+      - "8000:8000"   # au lieu de "80:8000"
+      - "8443:8000"     # HTTPS
       - "127.0.0.1:8001:8001"  # Admin API, accessible uniquement localement
     depends_on:
       - auth_service
