@@ -205,7 +205,7 @@ class TypeContratSerializer(serializers.ModelSerializer):
 
 
 class ContratSerializer(serializers.ModelSerializer):
-    type_contrat = TypeContratSerializer(read_only=True)
+    type_contrat = TypeContratSerializer(read_only=True, allow_null=True)
     type_contrat_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
 
     employer = EmployerSerializer(read_only=True)

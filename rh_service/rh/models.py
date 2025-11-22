@@ -398,32 +398,17 @@ class Contrat(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    employer = models.ForeignKey(
-        'Employer', on_delete=models.CASCADE, related_name='contrats'
-    )
-    type_contrat = models.ForeignKey(
-        TypeContrat, on_delete=models.SET_NULL, null=True, related_name='contrats'
-    )
-    nature_contrat = models.CharField(
-        max_length=20, choices=NATURE_CHOICES, default='emploi',
-        help_text="Définit si c’est un contrat de travail, de mission ou de prestation"
-    )
-    status_contrat = models.CharField(
-        max_length=20, choices=STATUS_CHOICES, default='actif'
-    )
+    employer = models.ForeignKey('Employer', on_delete=models.CASCADE, related_name='contrats')
+    type_contrat = models.ForeignKey('TypeContrat', on_delete=models.SET_NULL, null=True, blank=True, related_name='contrats')
+    nature_contrat = models.CharField(max_length=20, choices=NATURE_CHOICES, default='emploi')
+    status_contrat = models.CharField(max_length=20, choices=STATUS_CHOICES, default='actif')
     date_debut_contrat = models.DateField()
     date_fin_contrat = models.DateField(blank=True, null=True)
-    duree_jours = models.PositiveIntegerField(
-        blank=True, null=True, help_text="Durée effective du contrat en jours"
-    )
+    duree_jours = models.PositiveIntegerField(blank=True, null=True)
     salaire = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
-    montant_total = models.DecimalField(
-        max_digits=12, decimal_places=2, blank=True, null=True,
-        help_text="Montant total à payer (utile pour une mission ou prestation)"
-    )
-    description_mission = models.TextField(
-        blank=True, null=True, help_text="Détails de la mission ou de la prestation"
-    )
+    montant_total = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    description_mission = models.TextField(blank=True, null=True)
+    contrat_file = models.FileField(upload_to='contrats/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -437,30 +422,32 @@ class Contrat(models.Model):
         return f"{self.nature_contrat.capitalize()} - {self.employer} ({type_nom})"
 
     def clean(self):
-        # Vérifier cohérence des dates
+        # Vérification cohérence des dates
         if self.date_fin_contrat and self.date_debut_contrat > self.date_fin_contrat:
             raise ValueError("La date de début ne peut pas être après la date de fin du contrat.")
 
         # Calcul automatique de la durée
         if self.date_fin_contrat:
             self.duree_jours = (self.date_fin_contrat - self.date_debut_contrat).days
+        else:
+            self.duree_jours = None
 
-        # Si mission ou prestation : vérifier la durée max du type
+        # Vérification durée max pour mission ou prestation
         if self.nature_contrat in ['mission', 'prestation'] and self.type_contrat:
-            if self.type_contrat.duree_max_jours and self.duree_jours:
-                if self.duree_jours > self.type_contrat.duree_max_jours:
-                    raise ValueError(
-                        f"La durée du contrat ({self.duree_jours} jours) dépasse la limite autorisée "
-                        f"pour ce type ({self.type_contrat.duree_max_jours} jours)."
-                    )
+            max_duree = self.type_contrat.duree_max_jours
+            if max_duree and self.duree_jours and self.duree_jours > max_duree:
+                raise ValueError(
+                    f"La durée du contrat ({self.duree_jours} jours) dépasse la limite ({max_duree} jours) pour ce type."
+                )
 
-        # Vérifier chevauchement des contrats actifs uniquement pour les contrats d’emploi
+        # Vérification chevauchement pour contrats d’emploi
         if self.nature_contrat == 'emploi':
+            date_fin = self.date_fin_contrat or date.max
             chevauchements = Contrat.objects.filter(
                 employer=self.employer,
                 status_contrat='actif',
                 nature_contrat='emploi',
-                date_debut_contrat__lte=self.date_fin_contrat or date.max,
+                date_debut_contrat__lte=date_fin,
                 date_fin_contrat__gte=self.date_debut_contrat
             )
             if self.pk:
