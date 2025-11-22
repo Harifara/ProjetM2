@@ -199,17 +199,19 @@ class TypeContratViewSet(viewsets.ModelViewSet):
     ordering_fields = ['nom_type', 'created_at']
 
 class ContratViewSet(viewsets.ModelViewSet):
-    queryset = Contrat.objects.select_related('type_contrat', 'employer').all()
+    queryset = Contrat.objects.all()  # pas de select_related pour l'instant
     serializer_class = ContratSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['status_contrat', 'type_contrat', 'employer', 'nature_contrat']
     search_fields = ['employer__nom_employer', 'employer__prenom_employer']
     ordering_fields = ['date_debut_contrat', 'date_fin_contrat', 'salaire']
+
     @action(detail=False, methods=['get'])
     def actifs(self, request):
         contrats = self.queryset.filter(status_contrat='actif')
         serializer = self.get_serializer(contrats, many=True)
         return Response(serializer.data)
+
 
 
 class LocationViewSet(viewsets.ModelViewSet):

@@ -205,11 +205,13 @@ class TypeContratSerializer(serializers.ModelSerializer):
 
 
 class ContratSerializer(serializers.ModelSerializer):
+    # Lecture seule
     type_contrat = TypeContratSerializer(read_only=True, allow_null=True)
-    type_contrat_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    employer = EmployerSerializer(read_only=True, allow_null=True)
 
-    employer = EmployerSerializer(read_only=True)
-    employer_id = serializers.UUIDField(write_only=True)
+    # Écriture
+    type_contrat_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    employer_id = serializers.UUIDField(write_only=True, required=True)
 
     class Meta:
         model = Contrat
@@ -229,6 +231,28 @@ class ContratSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
+
+    def create(self, validated_data):
+        employer_id = validated_data.pop('employer_id', None)
+        type_contrat_id = validated_data.pop('type_contrat_id', None)
+
+        if employer_id:
+            validated_data['employer_id'] = employer_id
+        if type_contrat_id:
+            validated_data['type_contrat_id'] = type_contrat_id
+
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        employer_id = validated_data.pop('employer_id', None)
+        type_contrat_id = validated_data.pop('type_contrat_id', None)
+
+        if employer_id is not None:
+            instance.employer_id = employer_id
+        if type_contrat_id is not None:
+            instance.type_contrat_id = type_contrat_id
+
+        return super().update(instance, validated_data)
 
 
 
