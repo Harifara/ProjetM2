@@ -207,16 +207,29 @@ class TypeContratSerializer(serializers.ModelSerializer):
 class ContratSerializer(serializers.ModelSerializer):
     type_contrat = TypeContratSerializer(read_only=True)
     type_contrat_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+
     employer = EmployerSerializer(read_only=True)
     employer_id = serializers.UUIDField(write_only=True)
 
     class Meta:
         model = Contrat
         fields = [
-            'id', 'status_contrat', 'date_debut_contrat', 'date_fin_contrat',
-            'salaire', 'type_contrat', 'type_contrat_id', 'employer',
-            'employer_id', 'created_at', 'updated_at'
+            'id',
+            'employer', 'employer_id',
+            'type_contrat', 'type_contrat_id',
+            'nature_contrat',
+            'status_contrat',
+            'date_debut_contrat',
+            'date_fin_contrat',
+            'duree_jours',
+            'salaire',
+            'montant_total',
+            'description_mission',
+            'contrat_file',
+            'created_at',
+            'updated_at',
         ]
+
 
 
 class LocationSerializer(serializers.ModelSerializer):
