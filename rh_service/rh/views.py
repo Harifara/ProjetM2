@@ -4,7 +4,6 @@ from rest_framework.decorators import action
 from rest_framework.authentication import BasicAuthentication
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django_filters.rest_framework import DjangoFilterBackend
-
 from .models import (
     District, Commune, Fokontany, Fonction, Affectation,
     Employer, TypeConge, Conge, TypeContrat, Contrat, Location,
@@ -215,10 +214,10 @@ class ContratViewSet(viewsets.ModelViewSet):
 
 
 class LocationViewSet(viewsets.ModelViewSet):
-    queryset = Location.objects.select_related('affectation').all()
+    queryset = Location.objects.all()
     serializer_class = LocationSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['ville', 'affectation']
+    filterset_fields = ['ville']
     search_fields = ['adresse', 'ville', 'code_postal']
     ordering_fields = ['ville', 'created_at']
 

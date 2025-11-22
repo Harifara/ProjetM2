@@ -220,14 +220,12 @@ class ContratSerializer(serializers.ModelSerializer):
 
 
 class LocationSerializer(serializers.ModelSerializer):
-    affectation = AffectationSerializer(read_only=True)
-    affectation_id = serializers.UUIDField(write_only=True)
-
     class Meta:
         model = Location
         fields = [
-            'id', 'adresse', 'ville', 'code_postal',
-            'affectation', 'affectation_id', 'created_at', 'updated_at'
+            'id', 'nom', 'type_location', 'description',
+            'adresse', 'ville', 'code_postal', 'montant',
+            'date_echeance', 'created_at', 'updated_at'
         ]
 
 

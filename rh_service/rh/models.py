@@ -482,8 +482,8 @@ class Contrat(models.Model):
 # -------------------- Location --------------------
 class Location(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    nom = models.CharField(max_length=100, default='Nom par défaut') # ex: "Voiture X", "Salle de réunion"
-    type_location = models.CharField(max_length=50, default='inconnu')  # voiture, matériel, bureau...
+    nom = models.CharField(max_length=100, default='Nom par défaut')
+    type_location = models.CharField(max_length=50, default='inconnu')
     description = models.TextField(blank=True, null=True)
     adresse = models.TextField(blank=True, null=True)
     ville = models.CharField(max_length=100, blank=True, null=True)
@@ -495,6 +495,7 @@ class Location(models.Model):
 
     def __str__(self):
         return f"{self.nom} ({self.type_location})"
+
 
 
 # -------------------- Electricité --------------------
