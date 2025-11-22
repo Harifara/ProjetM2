@@ -202,10 +202,14 @@ class ContratViewSet(viewsets.ModelViewSet):
     queryset = Contrat.objects.select_related('type_contrat', 'employer').all()
     serializer_class = ContratSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['status_contrat', 'type_contrat', 'employer']
+
+    # 🔹 Ajout de 'nature_contrat' pour filtrage côté frontend
+    filterset_fields = ['status_contrat', 'type_contrat', 'employer', 'nature_contrat']
+
     search_fields = ['employer__nom_employer', 'employer__prenom_employer']
     ordering_fields = ['date_debut_contrat', 'date_fin_contrat', 'salaire']
 
+    # Liste des contrats actifs uniquement
     @action(detail=False, methods=['get'])
     def actifs(self, request):
         contrats = self.queryset.filter(status_contrat='actif')
