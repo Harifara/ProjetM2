@@ -6,9 +6,7 @@ from .models import (
     TypeAchat, Achat
 )
 from django.utils import timezone
-from .serializers import SimpleContratSerializer
-from .serializers import SimpleContratSerializer
-from .serializers import SimpleContratSerializer
+
 
 
 
@@ -318,16 +316,40 @@ class DemandeSerializer(serializers.ModelSerializer):
 
 class PayementSerializer(serializers.ModelSerializer):
     mode_payement = ModePayementSerializer(read_only=True)
-    mode_payement_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    mode_payement_id = serializers.PrimaryKeyRelatedField(
+        queryset=ModePayement.objects.all(),
+        source='mode_payement',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
 
-    location = SimpleLocationSerializer(read_only=True)
-    location_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    location = LocationSerializer(read_only=True)
+    location_id = serializers.PrimaryKeyRelatedField(
+        queryset=Location.objects.all(),
+        source='location',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
 
     electricite = ElectriciteSerializer(read_only=True)
-    electricite_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    electricite_id = serializers.PrimaryKeyRelatedField(
+        queryset=Electricite.objects.all(),
+        source='electricite',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
 
-    contrat = SimpleContratSerializer(read_only=True)
-    contrat_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    contrat = ContratSerializer(read_only=True)
+    contrat_id = serializers.PrimaryKeyRelatedField(
+        queryset=Contrat.objects.all(),
+        source='contrat',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
 
     class Meta:
         model = Payement
@@ -339,6 +361,7 @@ class PayementSerializer(serializers.ModelSerializer):
             'contrat', 'contrat_id',
             'created_at', 'updated_at'
         ]
+
 
 
 
