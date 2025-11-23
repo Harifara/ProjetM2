@@ -315,19 +315,27 @@ class DemandeSerializer(serializers.ModelSerializer):
 class PayementSerializer(serializers.ModelSerializer):
     mode_payement = ModePayementSerializer(read_only=True)
     mode_payement_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
-    demande = DemandeSerializer(read_only=True)
-    demande_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+
+    location = SimpleLocationSerializer(read_only=True)
+    location_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+
     electricite = ElectriciteSerializer(read_only=True)
     electricite_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+
+    contrat = SimpleContratSerializer(read_only=True)
+    contrat_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
 
     class Meta:
         model = Payement
         fields = [
             'id', 'montant', 'date_payement', 'status', 'reference',
-            'mode_payement', 'mode_payement_id', 'demande', 'demande_id',
+            'mode_payement', 'mode_payement_id',
+            'location', 'location_id',
             'electricite', 'electricite_id',
+            'contrat', 'contrat_id',
             'created_at', 'updated_at'
         ]
+
 
 
 class TypeAchatSerializer(serializers.ModelSerializer):

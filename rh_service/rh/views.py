@@ -268,11 +268,11 @@ class DemandeViewSet(viewsets.ModelViewSet):
 
 class PayementViewSet(viewsets.ModelViewSet):
     queryset = Payement.objects.select_related(
-        'mode_payement', 'demande', 'electricite', 'loyer'
+        'mode_payement', 'location', 'electricite', 'contrat'
     ).all()
     serializer_class = PayementSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['status', 'mode_payement', 'demande', 'electricite']
+    filterset_fields = ['status', 'mode_payement', 'location', 'electricite', 'contrat']
     search_fields = ['reference']
     ordering_fields = ['date_payement', 'montant']
 
