@@ -554,25 +554,21 @@ class Payement(models.Model):
             raise ValidationError("Un paiement doit être lié à au moins une chose à payer (Location, Electricité ou Contrat).")
 
     def save(self, *args, **kwargs):
-        # Calcul automatique du montant si non précisé
         if not self.montant:
             total = Decimal('0.00')
-            if self.location:
+            if self.location and self.location.montant:
                 total += self.location.montant
-            if self.electricite:
+            if self.electricite and self.electricite.montant:
                 total += self.electricite.montant
-            if self.contrat:
+            if self.contrat and self.contrat.salaire:
                 total += self.contrat.salaire
 
-            # Si paiement par avance, tu peux définir un pourcentage ou un montant fixe
             if self.paiement_type == 'avance':
-                total *= Decimal('0.30')  # par exemple 30% d’avance
+                total *= Decimal('0.30')
             self.montant = total
 
-        # Référence automatique
         if not self.reference:
             self.reference = f"PAY-{uuid.uuid4().hex[:8].upper()}"
-
         super().save(*args, **kwargs)
 
 
