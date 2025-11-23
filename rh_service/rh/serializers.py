@@ -241,7 +241,12 @@ class ContratSerializer(serializers.ModelSerializer):
         if type_contrat_id:
             validated_data['type_contrat_id'] = type_contrat_id
 
-        return super().create(validated_data)
+        try:
+            return super().create(validated_data)
+        except ValueError as e:
+            raise serializers.ValidationError({"detail": str(e)})
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.message_dict)
 
     def update(self, instance, validated_data):
         employer_id = validated_data.pop('employer_id', None)
@@ -252,7 +257,17 @@ class ContratSerializer(serializers.ModelSerializer):
         if type_contrat_id is not None:
             instance.type_contrat_id = type_contrat_id
 
-        return super().update(instance, validated_data)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        try:
+            instance.save()
+        except ValueError as e:
+            raise serializers.ValidationError({"detail": str(e)})
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.message_dict)
+
+        return instance
 
 
 
