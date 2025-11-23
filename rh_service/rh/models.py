@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 
@@ -535,6 +536,11 @@ class Payement(models.Model):
     date_payement = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente')
     reference = models.CharField(max_length=100, unique=True, blank=True)
+    pourcentage = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        default=100.0,  # par défaut paiement total
+        validators=[MinValueValidator(1), MaxValueValidator(100)]
+    )
     mode_payement = models.ForeignKey(ModePayement, on_delete=models.SET_NULL, null=True, related_name='payements')
     location = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, blank=True, related_name='payements')
     electricite = models.ForeignKey(Electricite, on_delete=models.SET_NULL, null=True, blank=True, related_name='payements')
@@ -554,21 +560,29 @@ class Payement(models.Model):
             raise ValidationError("Un paiement doit être lié à au moins une chose à payer (Location, Electricité ou Contrat).")
 
     def save(self, *args, **kwargs):
+        
         if not self.montant:
             total = Decimal('0.00')
-            if self.location and self.location.montant:
-                total += self.location.montant
-            if self.electricite and self.electricite.montant:
-                total += self.electricite.montant
-            if self.contrat and self.contrat.salaire:
-                total += self.contrat.salaire
 
-            if self.paiement_type == 'avance':
-                total *= Decimal('0.30')
+            if self.location and getattr(self.location, 'montant', None):
+                total += Decimal(self.location.montant)
+
+            if self.electricite and getattr(self.electricite, 'montant', None):
+                total += Decimal(self.electricite.montant)
+
+            if self.contrat and getattr(self.contrat, 'salaire', None):
+                total += Decimal(self.contrat.salaire)
+
+            # Appliquer le pourcentage si défini, sinon 100%
+            pourcentage = getattr(self, 'pourcentage', Decimal('100.00'))
+            total *= (Decimal(pourcentage) / Decimal('100.00'))
+
             self.montant = total
 
+        # Générer une référence unique si elle n'existe pas
         if not self.reference:
             self.reference = f"PAY-{uuid.uuid4().hex[:8].upper()}"
+
         super().save(*args, **kwargs)
 
 

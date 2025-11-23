@@ -353,6 +353,8 @@ class PayementSerializer(serializers.ModelSerializer):
 
     # Champ paiement_type
     paiement_type = serializers.ChoiceField(choices=Payement.PAYMENT_TYPE_CHOICES, required=False, default='total')
+    pourcentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, default=100.0)
+
 
     class Meta:
         model = Payement
@@ -360,7 +362,7 @@ class PayementSerializer(serializers.ModelSerializer):
             'id', 'montant', 'paiement_type', 'date_payement', 'status', 'reference',
             'mode_payement', 'mode_payement_id',
             'location', 'location_id',
-            'electricite', 'electricite_id',
+            'electricite', 'electricite_id', 'pourcentage',
             'contrat', 'contrat_id',
             'created_at', 'updated_at'
         ]
