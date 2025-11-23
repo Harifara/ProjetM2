@@ -6,6 +6,10 @@ from .models import (
     TypeAchat, Achat
 )
 from django.utils import timezone
+from .serializers import SimpleContratSerializer
+from .serializers import SimpleContratSerializer
+from .serializers import SimpleContratSerializer
+
 
 
 class DistrictSerializer(serializers.ModelSerializer):
