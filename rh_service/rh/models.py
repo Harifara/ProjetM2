@@ -519,8 +519,18 @@ class Payement(models.Model):
         ('echoue', 'Échoué'),
         ('annule', 'Annulé'),
     ]
+    
+    PAYMENT_TYPE_CHOICES = [
+        ('total', 'Paiement total'),
+        ('avance', 'Avancement / Tranche'),
+    ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    paiement_type = models.CharField(
+        max_length=10, 
+        choices=PAYMENT_TYPE_CHOICES, 
+        default='total'
+    )
     montant = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
     date_payement = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente')
@@ -552,7 +562,11 @@ class Payement(models.Model):
             if self.electricite:
                 total += self.electricite.montant
             if self.contrat:
-                total += self.contrat.salaire  # ou autre champ correspondant
+                total += self.contrat.salaire
+
+            # Si paiement par avance, tu peux définir un pourcentage ou un montant fixe
+            if self.paiement_type == 'avance':
+                total *= Decimal('0.30')  # par exemple 30% d’avance
             self.montant = total
 
         # Référence automatique
@@ -560,6 +574,7 @@ class Payement(models.Model):
             self.reference = f"PAY-{uuid.uuid4().hex[:8].upper()}"
 
         super().save(*args, **kwargs)
+
 
 
 # -------------------- TypeAchat --------------------

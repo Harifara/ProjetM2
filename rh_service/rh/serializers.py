@@ -315,7 +315,13 @@ class DemandeSerializer(serializers.ModelSerializer):
 
 
 class PayementSerializer(serializers.ModelSerializer):
+    # Relations en lecture seule
     mode_payement = ModePayementSerializer(read_only=True)
+    location = LocationSerializer(read_only=True)
+    electricite = ElectriciteSerializer(read_only=True)
+    contrat = ContratSerializer(read_only=True)
+
+    # Champs écriture pour ForeignKey
     mode_payement_id = serializers.PrimaryKeyRelatedField(
         queryset=ModePayement.objects.all(),
         source='mode_payement',
@@ -323,8 +329,6 @@ class PayementSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True
     )
-
-    location = LocationSerializer(read_only=True)
     location_id = serializers.PrimaryKeyRelatedField(
         queryset=Location.objects.all(),
         source='location',
@@ -332,8 +336,6 @@ class PayementSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True
     )
-
-    electricite = ElectriciteSerializer(read_only=True)
     electricite_id = serializers.PrimaryKeyRelatedField(
         queryset=Electricite.objects.all(),
         source='electricite',
@@ -341,8 +343,6 @@ class PayementSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True
     )
-
-    contrat = ContratSerializer(read_only=True)
     contrat_id = serializers.PrimaryKeyRelatedField(
         queryset=Contrat.objects.all(),
         source='contrat',
@@ -351,16 +351,20 @@ class PayementSerializer(serializers.ModelSerializer):
         allow_null=True
     )
 
+    # Champ paiement_type
+    paiement_type = serializers.ChoiceField(choices=Payement.PAYMENT_TYPE_CHOICES, required=False, default='total')
+
     class Meta:
         model = Payement
         fields = [
-            'id', 'montant', 'date_payement', 'status', 'reference',
+            'id', 'montant', 'paiement_type', 'date_payement', 'status', 'reference',
             'mode_payement', 'mode_payement_id',
             'location', 'location_id',
             'electricite', 'electricite_id',
             'contrat', 'contrat_id',
             'created_at', 'updated_at'
         ]
+        read_only_fields = ['id', 'reference', 'created_at', 'updated_at', 'date_payement']
 
 
 
