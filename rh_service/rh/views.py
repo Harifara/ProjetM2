@@ -271,6 +271,33 @@ class AchatViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error': str(e)}, status=500)
 
+
+class PayementViewSet(viewsets.ModelViewSet):
+    queryset = Payement.objects.select_related(
+        'mode_payement', 'location', 'electricite', 'contrat'
+    ).prefetch_related('demandes').all()
+    serializer_class = PayementSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['status', 'mode_payement', 'location', 'electricite', 'contrat', 'paiement_type']
+    search_fields = ['reference']
+    ordering_fields = ['date_payement', 'montant']
+    ordering = ['-date_payement']
+
+    def perform_create(self, serializer):
+        # Calcul automatique du montant si non défini
+        serializer.save()
+
+    def perform_update(self, serializer):
+        # Recalcul du montant si nécessaire
+        serializer.save()
+
+    @action(detail=True, methods=['post'])
+    def complete(self, request, pk=None):
+        payement = self.get_object()
+        payement.status = 'complete'
+        payement.save()
+        serializer = self.get_serializer(payement)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     
 class DemandeViewSet(viewsets.ModelViewSet):
     queryset = Demande.objects.select_related('employer').prefetch_related('achats', 'payements').all()
@@ -299,29 +326,3 @@ class DemandeViewSet(viewsets.ModelViewSet):
 
 
 # -------------------- Payement --------------------
-class PayementViewSet(viewsets.ModelViewSet):
-    queryset = Payement.objects.select_related(
-        'mode_payement', 'location', 'electricite', 'contrat'
-    ).prefetch_related('demandes').all()
-    serializer_class = PayementSerializer
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['status', 'mode_payement', 'location', 'electricite', 'contrat', 'paiement_type']
-    search_fields = ['reference']
-    ordering_fields = ['date_payement', 'montant']
-    ordering = ['-date_payement']
-
-    def perform_create(self, serializer):
-        # Calcul automatique du montant si non défini
-        serializer.save()
-
-    def perform_update(self, serializer):
-        # Recalcul du montant si nécessaire
-        serializer.save()
-
-    @action(detail=True, methods=['post'])
-    def complete(self, request, pk=None):
-        payement = self.get_object()
-        payement.status = 'complete'
-        payement.save()
-        serializer = self.get_serializer(payement)
-        return Response(serializer.data, status=status.HTTP_200_OK)
