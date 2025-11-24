@@ -10,7 +10,6 @@ from .models import (
     Electricite, ModePayement, Demande, Payement,
     TypeAchat, Achat
 )
-from django.db import DatabaseError
 from .serializers import (
     DistrictSerializer, CommuneSerializer, FokontanySerializer,
     FonctionSerializer, AffectationSerializer, EmployerSerializer,TypeCongeSerializer, 
@@ -266,17 +265,11 @@ class AchatViewSet(viewsets.ModelViewSet):
         achats = self.get_queryset().order_by('-created_at')[:10]
         serializer = self.get_serializer(achats, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    from django.db import DatabaseError
-
     def destroy(self, request, *args, **kwargs):
         try:
             return super().destroy(request, *args, **kwargs)
-        except DatabaseError as e:
-            if 'rh_demande_achats' in str(e):
-                # Retourner succès même si la table est absente
-                return Response({'message': 'Suppression ignorée, table inexistante'}, status=200)
+        except Exception as e:
             return Response({'error': str(e)}, status=500)
-
 
     
 class DemandeViewSet(viewsets.ModelViewSet):
