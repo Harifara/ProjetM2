@@ -249,7 +249,7 @@ class TypeAchatViewSet(viewsets.ModelViewSet):
 
     
 class AchatViewSet(viewsets.ModelViewSet):
-    queryset = Achat.objects.select_related('type_achat').prefetch_related('demandes').all()
+    queryset = Achat.objects.select_related('type_achat').all()  # supprime prefetch_related
     serializer_class = AchatSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['type_achat', 'created_at', 'statut']
@@ -262,7 +262,7 @@ class AchatViewSet(viewsets.ModelViewSet):
         achats = self.queryset.order_by('-created_at')[:10]
         serializer = self.get_serializer(achats, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
+
     
 class DemandeViewSet(viewsets.ModelViewSet):
     queryset = Demande.objects.select_related('employer').prefetch_related('achats', 'payements').all()
