@@ -312,15 +312,18 @@ class TypeAchatViewSet(viewsets.ModelViewSet):
 
 
 class AchatViewSet(viewsets.ModelViewSet):
-    queryset = Achat.objects.select_related('type_achat').all()
+    queryset = Achat.objects.select_related('type_achat', 'demande').all()
     serializer_class = AchatSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['type_achat', 'date_achat']
+
+    # retirer date_achat car il n'existe pas ❌
+    filterset_fields = ['type_achat', 'created_at']
     search_fields = ['article', 'code_achat']
-    ordering_fields = ['date_achat', 'montant', 'created_at']
+    ordering_fields = ['created_at', 'montant']
 
     @action(detail=False, methods=['get'])
     def recent(self, request):
-        achats = self.queryset.order_by('-date_achat')[:10]
+        achats = self.queryset.order_by('-created_at')[:10]
         serializer = self.get_serializer(achats, many=True)
         return Response(serializer.data)
+

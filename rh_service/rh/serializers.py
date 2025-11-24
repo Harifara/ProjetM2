@@ -381,9 +381,23 @@ class AchatSerializer(serializers.ModelSerializer):
     type_achat = TypeAchatSerializer(read_only=True)
     type_achat_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
 
+    demande_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    demande = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = Achat
         fields = [
-            'id', 'article', 'code_achat', 'nombre', 'montant', 'date_achat',
-            'type_achat', 'type_achat_id', 'created_at', 'updated_at'
+            'id', 'article', 'code_achat', 'nombre', 'montant',
+            'type_achat', 'type_achat_id',
+            'demande', 'demande_id',
+            'created_at', 'updated_at'
         ]
+
+    def get_demande(self, obj):
+        if obj.demande:
+            return {
+                "id": obj.demande.id,
+                "reference": obj.demande.reference
+            }
+        return None
+
