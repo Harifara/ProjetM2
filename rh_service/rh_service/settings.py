@@ -118,7 +118,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 
 # 💡 URL absolue complète pour les médias (utilisable côté frontend)
-MEDIA_FULL_URL = config("MEDIA_FULL_URL", default="http://localhost:9000")
+MEDIA_FULL_URL = config("MEDIA_FULL_URL", default="https://api.ecartmada.com/media/")
 
 # === Fallback par défaut pour les clés primaires ===
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
