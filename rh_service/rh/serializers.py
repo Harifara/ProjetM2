@@ -304,10 +304,7 @@ class ModePayementSerializer(serializers.ModelSerializer):
 
 
 
-class TypeAchatSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TypeAchat
-        fields = '__all__'
+
 class PayementSerializer(serializers.ModelSerializer):
     # Relations en lecture seule
     mode_payement = ModePayementSerializer(read_only=True)
@@ -359,6 +356,10 @@ class PayementSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'reference', 'created_at', 'updated_at', 'date_payement']
 
 
+class TypeAchatSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TypeAchat
+        fields = '__all__'
 # -------------------- Achat --------------------
 class AchatSerializer(serializers.ModelSerializer):
     type_achat = TypeAchatSerializer(read_only=True)

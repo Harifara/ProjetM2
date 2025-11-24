@@ -265,6 +265,11 @@ class AchatViewSet(viewsets.ModelViewSet):
         achats = self.get_queryset().order_by('-created_at')[:10]
         serializer = self.get_serializer(achats, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
 
     
 class DemandeViewSet(viewsets.ModelViewSet):
