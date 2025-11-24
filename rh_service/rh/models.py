@@ -666,3 +666,11 @@ class Demande(models.Model):
         else:
             self.status = 'en_cours'
         self.save()
+
+
+class DemandeAchat(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    demande = models.ForeignKey(Demande, on_delete=models.CASCADE, related_name='demande_achats')
+    achat = models.ForeignKey(Achat, on_delete=models.CASCADE, related_name='demande_achats')
+    class Meta:
+        unique_together = ('demande', 'achat')
