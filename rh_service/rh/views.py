@@ -249,7 +249,6 @@ class TypeAchatViewSet(viewsets.ModelViewSet):
 
     
 class AchatViewSet(viewsets.ModelViewSet):
-    queryset = Achat.objects.select_related('type_achat').all()  # supprime prefetch_related
     serializer_class = AchatSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['type_achat', 'created_at', 'statut']
@@ -257,9 +256,13 @@ class AchatViewSet(viewsets.ModelViewSet):
     ordering_fields = ['created_at', 'montant']
     ordering = ['-created_at']
 
+    def get_queryset(self):
+        # Utiliser select_related seulement si type_achat n'est pas null
+        return Achat.objects.select_related('type_achat').all()
+
     @action(detail=False, methods=['get'])
     def recent(self, request):
-        achats = self.queryset.order_by('-created_at')[:10]
+        achats = self.get_queryset().order_by('-created_at')[:10]
         serializer = self.get_serializer(achats, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
