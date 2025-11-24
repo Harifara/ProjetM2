@@ -10,6 +10,7 @@ from .models import (
     Electricite, ModePayement, Demande, Payement,
     TypeAchat, Achat
 )
+from django.db import DatabaseError
 from .serializers import (
     DistrictSerializer, CommuneSerializer, FokontanySerializer,
     FonctionSerializer, AffectationSerializer, EmployerSerializer,TypeCongeSerializer, 
@@ -268,7 +269,10 @@ class AchatViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         try:
             return super().destroy(request, *args, **kwargs)
-        except Exception as e:
+        except DatabaseError as e:
+            # Vérifier si l'erreur vient d'une table manquante
+            if 'rh_demande_achats' in str(e):
+                return Response({'error': 'Table rh_demande_achats introuvable'}, status=400)
             return Response({'error': str(e)}, status=500)
 
     
