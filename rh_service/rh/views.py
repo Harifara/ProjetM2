@@ -300,11 +300,11 @@ class PayementViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
     
 class DemandeViewSet(viewsets.ModelViewSet):
-    queryset = Demande.objects.select_related('employer').prefetch_related('achats', 'payements').all()
+    queryset = Demande.objects.prefetch_related('achats', 'payements').all()
     serializer_class = DemandeSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['status', 'employer']
-    search_fields = ['description', 'employer__nom_employer', 'employer__prenom_employer']
+    filterset_fields = ['status']  # supprimer employer
+    search_fields = ['description']  # supprimer employer__nom_employer etc.
     ordering_fields = ['date_demande', 'montant']
     ordering = ['-date_demande']
 
@@ -323,6 +323,3 @@ class DemandeViewSet(viewsets.ModelViewSet):
         demande.save()
         serializer = self.get_serializer(demande)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-# -------------------- Payement --------------------
