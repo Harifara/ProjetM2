@@ -302,18 +302,12 @@ class ModePayementSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class DemandeSerializer(serializers.ModelSerializer):
-    employer = EmployerSerializer(read_only=True)
-    employer_id = serializers.UUIDField(write_only=True)
 
+
+class TypeAchatSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Demande
-        fields = [
-            'id', 'description', 'montant', 'status', 'date_demande',
-            'employer', 'employer_id', 'created_at', 'updated_at'
-        ]
-
-
+        model = TypeAchat
+        fields = '__all__'
 class PayementSerializer(serializers.ModelSerializer):
     # Relations en lecture seule
     mode_payement = ModePayementSerializer(read_only=True)
@@ -351,53 +345,67 @@ class PayementSerializer(serializers.ModelSerializer):
         allow_null=True
     )
 
-    # Champ paiement_type
-    paiement_type = serializers.ChoiceField(choices=Payement.PAYMENT_TYPE_CHOICES, required=False, default='total')
-    pourcentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, default=100.0)
-
-
     class Meta:
         model = Payement
         fields = [
             'id', 'montant', 'paiement_type', 'date_payement', 'status', 'reference',
+            'pourcentage',
             'mode_payement', 'mode_payement_id',
             'location', 'location_id',
-            'electricite', 'electricite_id', 'pourcentage',
+            'electricite', 'electricite_id',
             'contrat', 'contrat_id',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'reference', 'created_at', 'updated_at', 'date_payement']
 
 
-
-
-class TypeAchatSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TypeAchat
-        fields = '__all__'
-
-
+# -------------------- Achat --------------------
 class AchatSerializer(serializers.ModelSerializer):
     type_achat = TypeAchatSerializer(read_only=True)
-    type_achat_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
-
-    demande_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
-    demande = serializers.SerializerMethodField(read_only=True)
+    type_achat_id = serializers.PrimaryKeyRelatedField(
+        queryset=TypeAchat.objects.all(),
+        source='type_achat',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
 
     class Meta:
         model = Achat
         fields = [
             'id', 'article', 'code_achat', 'nombre', 'montant',
-            'type_achat', 'type_achat_id',
-            'demande', 'demande_id',
+            'type_achat', 'type_achat_id', 'statut',
             'created_at', 'updated_at'
         ]
 
-    def get_demande(self, obj):
-        if obj.demande:
-            return {
-                "id": obj.demande.id,
-                "reference": obj.demande.reference
-            }
-        return None
+# -------------------- Demande --------------------
+class DemandeSerializer(serializers.ModelSerializer):
+    achats = AchatSerializer(many=True, read_only=True)
+    achats_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Achat.objects.all(),
+        many=True,
+        write_only=True,
+        source='achats'
+    )
+    payements = PayementSerializer(many=True, read_only=True)
+    payements_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Payement.objects.all(),
+        many=True,
+        write_only=True,
+        source='payements'
+    )
 
+    montant = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Demande
+        fields = [
+            'id', 'description', 'status', 'date_demande',
+            'achats', 'achats_ids',
+            'payements', 'payements_ids',
+            'montant',
+            'created_at', 'updated_at'
+        ]
+
+    def get_montant(self, obj):
+        return obj.montant_total()

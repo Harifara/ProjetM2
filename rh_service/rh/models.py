@@ -512,78 +512,7 @@ class ModePayement(models.Model):
         return self.mode_payement
 
 
-# -------------------- Paiement --------------------
-class Payement(models.Model):
-    STATUS_CHOICES = [
-        ('en_attente', 'En attente'),
-        ('complete', 'Complété'),
-        ('echoue', 'Échoué'),
-        ('annule', 'Annulé'),
-    ]
-    
-    PAYMENT_TYPE_CHOICES = [
-        ('total', 'Paiement total'),
-        ('avance', 'Avancement / Tranche'),
-    ]
 
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    paiement_type = models.CharField(
-        max_length=10, 
-        choices=PAYMENT_TYPE_CHOICES, 
-        default='total'
-    )
-    montant = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-    date_payement = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente')
-    reference = models.CharField(max_length=100, unique=True, blank=True)
-    pourcentage = models.DecimalField(
-        max_digits=5, decimal_places=2,
-        default=100.0,  # par défaut paiement total
-        validators=[MinValueValidator(1), MaxValueValidator(100)]
-    )
-    mode_payement = models.ForeignKey(ModePayement, on_delete=models.SET_NULL, null=True, related_name='payements')
-    location = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, blank=True, related_name='payements')
-    electricite = models.ForeignKey(Electricite, on_delete=models.SET_NULL, null=True, blank=True, related_name='payements')
-    contrat = models.ForeignKey('Contrat', on_delete=models.SET_NULL, null=True, blank=True, related_name='payements')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-date_payement']
-
-    def __str__(self):
-        return f"Paiement {self.reference} - {self.montant}"
-
-    def clean(self):
-        # Vérifier qu'au moins un élément est lié
-        if not (self.location or self.electricite or self.contrat):
-            raise ValidationError("Un paiement doit être lié à au moins une chose à payer (Location, Electricité ou Contrat).")
-
-    def save(self, *args, **kwargs):
-        
-        if not self.montant:
-            total = Decimal('0.00')
-
-            if self.location and getattr(self.location, 'montant', None):
-                total += Decimal(self.location.montant)
-
-            if self.electricite and getattr(self.electricite, 'montant', None):
-                total += Decimal(self.electricite.montant)
-
-            if self.contrat and getattr(self.contrat, 'salaire', None):
-                total += Decimal(self.contrat.salaire)
-
-            # Appliquer le pourcentage si défini, sinon 100%
-            pourcentage = getattr(self, 'pourcentage', Decimal('100.00'))
-            total *= (Decimal(pourcentage) / Decimal('100.00'))
-
-            self.montant = total
-
-        # Générer une référence unique si elle n'existe pas
-        if not self.reference:
-            self.reference = f"PAY-{uuid.uuid4().hex[:8].upper()}"
-
-        super().save(*args, **kwargs)
 
 
 
@@ -606,40 +535,113 @@ class TypeAchat(models.Model):
 
 
 # -------------------- Achat --------------------
+# -------------------- Achat --------------------
 class Achat(models.Model):
+    STATUT_CHOICES = [
+        ('non_demande', 'Non demandé'),
+        ('attente_finance', 'En attente finance'),
+        ('valide', 'Validé'),
+        ('refuse', 'Refusé'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    demande = models.ForeignKey('Demande', on_delete=models.CASCADE, null=True, related_name="achats")  # Correction
     article = models.CharField(max_length=200)
     code_achat = models.CharField(max_length=50, unique=True)
     nombre = models.IntegerField(default=1)
     montant = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     type_achat = models.ForeignKey(TypeAchat, on_delete=models.SET_NULL, null=True, related_name='achats')
+    statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='non_demande')
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['article']  # correction: date_achat n'existe pas
+        ordering = ['article']
         verbose_name = 'Achat'
         verbose_name_plural = 'Achats'
 
     def __str__(self):
-        return f"{self.article} - {self.code_achat}"
+        return f"{self.article} ({self.statut})"
+
+    def montant_total(self):
+        return self.montant * self.nombre
+
+
+# -------------------- Payement --------------------
+class Payement(models.Model):
+    STATUS_CHOICES = [
+        ('en_attente', 'En attente'),
+        ('complete', 'Complété'),
+        ('echoue', 'Échoué'),
+        ('annule', 'Annulé'),
+    ]
+
+    PAYMENT_TYPE_CHOICES = [
+        ('total', 'Paiement total'),
+        ('avance', 'Avancement / Tranche'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    paiement_type = models.CharField(max_length=10, choices=PAYMENT_TYPE_CHOICES, default='total')
+    montant = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente')
+    date_payement = models.DateTimeField(auto_now_add=True)
+    reference = models.CharField(max_length=100, unique=True, blank=True)
+    pourcentage = models.DecimalField(
+        max_digits=5, decimal_places=2, default=100.0,
+        validators=[MinValueValidator(1), MaxValueValidator(100)]
+    )
+    mode_payement = models.ForeignKey(ModePayement, on_delete=models.SET_NULL, null=True, related_name='payements')
+    location = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, blank=True, related_name='payements')
+    electricite = models.ForeignKey(Electricite, on_delete=models.SET_NULL, null=True, blank=True, related_name='payements')
+    contrat = models.ForeignKey(Contrat, on_delete=models.SET_NULL, null=True, blank=True, related_name='payements')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date_payement']
+
+    def __str__(self):
+        return f"Paiement {self.reference} - {self.montant}"
+
+    def clean(self):
+        if not (self.location or self.electricite or self.contrat):
+            raise ValidationError("Un paiement doit être lié à au moins une chose à payer (Location, Electricité ou Contrat).")
+
+    def save(self, *args, **kwargs):
+        # Calcul automatique du montant si non défini
+        if not self.montant:
+            total = Decimal('0.00')
+            if self.location:
+                total += self.location.montant
+            if self.electricite:
+                total += self.electricite.montant
+            if self.contrat:
+                total += self.contrat.salaire or Decimal('0.00')
+            total *= (self.pourcentage / Decimal('100.00'))
+            self.montant = total
+
+        if not self.reference:
+            self.reference = f"PAY-{uuid.uuid4().hex[:8].upper()}"
+        super().save(*args, **kwargs)
 
 
 # -------------------- Demande --------------------
 class Demande(models.Model):
     STATUS_CHOICES = [
         ('en_attente', 'En attente'),
+        ('en_cours', 'En cours'),
         ('approuve', 'Approuvé'),
         ('refuse', 'Refusé'),
-        ('en_cours', 'En cours'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     description = models.TextField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente')
-    date_demande = models.DateTimeField(auto_now_add=True)
+    achats = models.ManyToManyField(Achat, related_name='demandes', blank=True)
     payements = models.ManyToManyField(Payement, related_name='demandes', blank=True)
+    date_demande = models.DateTimeField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -647,18 +649,19 @@ class Demande(models.Model):
         ordering = ['-date_demande']
 
     def __str__(self):
-        return f"Demande {self.id} - {self.montant_total()}"
+        return f"Demande {self.id} - Total: {self.montant_total()}"
 
-    # Calcul automatique du montant total des achats liés
     def montant_total(self):
-        return sum([achat.montant * achat.nombre for achat in self.achats.all()])
+        total_achats = sum(a.montant_total() for a in self.achats.all())
+        total_payements = sum(p.montant for p in self.payements.all())
+        return total_achats + total_payements
 
-    # Vérifie si tous les paiements sont complétés et met à jour le statut
     def update_status(self):
-        payements = getattr(self, 'payements', [])
-        if payements.exists() and all(p.status == 'complete' for p in payements.all()):
+        if all(a.statut == 'valide' for a in self.achats.all()) and \
+           all(p.status == 'complete' for p in self.payements.all()):
             self.status = 'approuve'
-        elif payements.exists() and any(p.status == 'echoue' for p in payements.all()):
+        elif any(a.statut == 'refuse' for a in self.achats.all()) or \
+             any(p.status == 'echoue' for p in self.payements.all()):
             self.status = 'refuse'
         else:
             self.status = 'en_cours'

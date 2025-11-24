@@ -240,14 +240,20 @@ class ModePayementViewSet(viewsets.ModelViewSet):
     search_fields = ['mode_payement', 'description']
     ordering_fields = ['mode_payement', 'created_at']
 
-
+class TypeAchatViewSet(viewsets.ModelViewSet):
+    queryset = TypeAchat.objects.all()
+    serializer_class = TypeAchatSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['type_achat', 'nom', 'description']
+    ordering_fields = ['nom', 'created_at']
 class DemandeViewSet(viewsets.ModelViewSet):
-    queryset = Demande.objects.select_related('employer').all()
+    queryset = Demande.objects.select_related('employer').prefetch_related('achats', 'payements').all()
     serializer_class = DemandeSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['status', 'employer']
     search_fields = ['description', 'employer__nom_employer', 'employer__prenom_employer']
     ordering_fields = ['date_demande', 'montant']
+    ordering = ['-date_demande']
 
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
@@ -255,7 +261,7 @@ class DemandeViewSet(viewsets.ModelViewSet):
         demande.status = 'approuve'
         demande.save()
         serializer = self.get_serializer(demande)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
@@ -263,16 +269,14 @@ class DemandeViewSet(viewsets.ModelViewSet):
         demande.status = 'refuse'
         demande.save()
         serializer = self.get_serializer(demande)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+# -------------------- Payement --------------------
 class PayementViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet pour gérer les paiements.
-    """
     queryset = Payement.objects.select_related(
         'mode_payement', 'location', 'electricite', 'contrat'
-    ).all()
+    ).prefetch_related('demandes').all()
     serializer_class = PayementSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['status', 'mode_payement', 'location', 'electricite', 'contrat', 'paiement_type']
@@ -281,49 +285,17 @@ class PayementViewSet(viewsets.ModelViewSet):
     ordering = ['-date_payement']
 
     def perform_create(self, serializer):
-        """
-        Calcul du montant selon le type de paiement avant création.
-        """
+        # Calcul automatique du montant si non défini
         serializer.save()
 
     def perform_update(self, serializer):
-        """
-        Recalcul du montant si nécessaire lors de la mise à jour.
-        """
+        # Recalcul du montant si nécessaire
         serializer.save()
 
     @action(detail=True, methods=['post'])
     def complete(self, request, pk=None):
-        """
-        Marquer un paiement comme complété.
-        """
         payement = self.get_object()
         payement.status = 'complete'
         payement.save()
         serializer = self.get_serializer(payement)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-class TypeAchatViewSet(viewsets.ModelViewSet):
-    queryset = TypeAchat.objects.all()
-    serializer_class = TypeAchatSerializer
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['type_achat', 'nom', 'description']
-    ordering_fields = ['nom', 'created_at']
-
-
-class AchatViewSet(viewsets.ModelViewSet):
-    queryset = Achat.objects.select_related('type_achat', 'demande').all()
-    serializer_class = AchatSerializer
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-
-    # retirer date_achat car il n'existe pas ❌
-    filterset_fields = ['type_achat', 'created_at']
-    search_fields = ['article', 'code_achat']
-    ordering_fields = ['created_at', 'montant']
-
-    @action(detail=False, methods=['get'])
-    def recent(self, request):
-        achats = self.queryset.order_by('-created_at')[:10]
-        serializer = self.get_serializer(achats, many=True)
-        return Response(serializer.data)
-
