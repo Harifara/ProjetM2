@@ -79,12 +79,27 @@ class ArticleViewSet(viewsets.ModelViewSet):
 # Magasins
 # =========================
 class MagasinViewSet(viewsets.ModelViewSet):
-    queryset = Magasin.objects.all()
     serializer_class = MagasinSerializer
     permission_classes = [IsResponsableStockOrReadOnly, CanAccessOwnMagasinOnly]
     filter_backends = [filters.OrderingFilter, filters.SearchFilter]
     search_fields = ['nom', 'adresse']
-    
+
+    def get_queryset(self):
+        user = self.request.user
+        role = getattr(user, "role", None)
+
+        # 1️⃣ Admin ou Responsable stock → accès total
+        if user.is_superuser or role == "admin" or role == "responsable_stock":
+            return Magasin.objects.all()
+
+        # 2️⃣ Magasinier → seulement son magasin
+        if role == "magasinier":
+            if not user.magasin_id:
+                return Magasin.objects.none()
+            return Magasin.objects.filter(id=user.magasin_id)
+
+        # 3️⃣ Tous les autres → aucun accès
+        return Magasin.objects.none()
 
 
 
