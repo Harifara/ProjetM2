@@ -320,11 +320,9 @@ class DemandeReapprovisionnement(models.Model):
     statut = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente')
     priorite = models.CharField(max_length=20, choices=PRIORITE_CHOICES, default='normale')
 
-    # 🔹 UUID du magasinier qui fait la demande
-    demandeur_id = models.UUIDField(help_text="UUID du magasinier qui fait la demande")
-
-    # 🔹 UUID du responsable stock qui valide
-    validateur_id = models.UUIDField(null=True, blank=True, help_text="UUID du responsable stock qui valide la demande")
+    # 🔹 UUID des utilisateurs (auth_service)
+    demandeur_id = models.UUIDField(help_text="UUID du magasinier connecté")
+    validateur_id = models.UUIDField(null=True, blank=True, help_text="UUID du responsable stock")
 
     date_validation = models.DateTimeField(null=True, blank=True)
     commentaire_validation = models.TextField(blank=True)
@@ -337,6 +335,7 @@ class DemandeReapprovisionnement(models.Model):
         verbose_name_plural = 'Demandes de réapprovisionnement'
         ordering = ['-created_at']
 
+    # 🔹 Méthodes
     def valider(self, responsable_stock_id: uuid.UUID):
         self.statut = 'approuve'
         self.validateur_id = responsable_stock_id
@@ -353,7 +352,6 @@ class DemandeReapprovisionnement(models.Model):
 
     def __str__(self):
         return f"{self.numero} - {self.article.nom} ({self.statut})"
-
 # TransfertStock
 # =========================
 class TransfertStock(models.Model):
@@ -482,60 +480,4 @@ class DemandeAchat(models.Model):
     def __str__(self):
         return f"{self.numero} - {self.article.nom} | Statut finance: {self.statut}, Réception: {self.statut_reception}"
 
-
-class DemandeReapprovisionnement(models.Model):
-    STATUS_CHOICES = [
-        ('en_attente', 'En attente'),
-        ('approuve', 'Approuvé'),
-        ('rejete', 'Rejeté'),
-    ]
-    PRIORITE_CHOICES = [
-        ('faible', 'Faible'),
-        ('normale', 'Normale'),
-        ('haute', 'Haute'),
-        ('urgente', 'Urgente')
-    ]
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    numero = models.CharField(max_length=100, unique=True)
-    magasin = models.ForeignKey(Magasin, on_delete=models.PROTECT, related_name='demandes_reappro')
-    article = models.ForeignKey(Article, on_delete=models.PROTECT, related_name='demandes_reappro')
-    quantite_demandee = models.IntegerField()
-    quantite_approuvee = models.IntegerField(null=True, blank=True)
-    motif = models.TextField()
-    statut = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente')
-    priorite = models.CharField(max_length=20, choices=PRIORITE_CHOICES, default='normale')
-
-    # 🔹 UUID des utilisateurs (auth_service)
-    demandeur_id = models.UUIDField(help_text="UUID du magasinier connecté")
-    validateur_id = models.UUIDField(null=True, blank=True, help_text="UUID du responsable stock")
-
-    date_validation = models.DateTimeField(null=True, blank=True)
-    commentaire_validation = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'demandes_reapprovisionnement'
-        verbose_name = 'Demande de réapprovisionnement'
-        verbose_name_plural = 'Demandes de réapprovisionnement'
-        ordering = ['-created_at']
-
-    # 🔹 Méthodes
-    def valider(self, responsable_stock_id: uuid.UUID):
-        self.statut = 'approuve'
-        self.validateur_id = responsable_stock_id
-        self.date_validation = timezone.now()
-        self.quantite_approuvee = self.quantite_demandee
-        self.save()
-
-    def rejeter(self, responsable_stock_id: uuid.UUID, commentaire: str = ''):
-        self.statut = 'rejete'
-        self.validateur_id = responsable_stock_id
-        self.date_validation = timezone.now()
-        self.commentaire_validation = commentaire
-        self.save()
-
-    def __str__(self):
-        return f"{self.numero} - {self.article.nom} ({self.statut})"
 
