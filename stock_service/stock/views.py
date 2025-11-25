@@ -136,7 +136,8 @@ class MouvementStockViewSet(viewsets.ModelViewSet):
 class DemandeReapprovisionnementViewSet(viewsets.ModelViewSet):
     queryset = DemandeReapprovisionnement.objects.select_related("magasin", "article").all()
     serializer_class = DemandeReapprovisionnementSerializer
-    permission_classes = [IsResponsableStockOrMagasinier]
+    permission_classes = [IsAuthenticated]
+
 
     def perform_create(self, serializer):
         """
