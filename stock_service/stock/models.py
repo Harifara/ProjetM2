@@ -176,8 +176,7 @@ class MouvementStock(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     article = models.ForeignKey("Article", on_delete=models.PROTECT, related_name="mouvements")
-    
-    # Magasins source et destination
+
     magasin_source = models.ForeignKey(
         "Magasin", null=True, blank=True, on_delete=models.PROTECT, related_name="mouvements_sortie"
     )
@@ -187,37 +186,29 @@ class MouvementStock(models.Model):
 
     quantite = models.PositiveIntegerField()
     type_mouvement = models.CharField(max_length=20, choices=TYPE_MOUVEMENT_CHOICES)
-    
-    # Magasinier et recepteur
-    magasinier_id = models.UUIDField(help_text="ID du magasinier (depuis auth_service)")
-    recepteur_id = models.UUIDField(null=True, blank=True, help_text="ID du recepteur (employé ou magasin)")
+
+    magasinier_id = models.UUIDField()
+    recepteur_id = models.UUIDField(null=True, blank=True)
     recepteur_type = models.CharField(max_length=50, choices=RECEPTEUR_CHOICES, default='magasin')
 
-    # Transport, commentaire, référence
     transporteur = models.CharField(max_length=255, blank=True, null=True)
     commentaire = models.TextField(blank=True, null=True)
     reference = models.CharField(max_length=100, blank=True, null=True)
 
-    # Statut et dates
     statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='valide')
     date_mouvement = models.DateTimeField(default=timezone.now)
     date_validation = models.DateTimeField(null=True, blank=True)
 
-    # Pour lier les transferts
     transfert_id = models.UUIDField(null=True, blank=True)
 
-    # Traçabilité
     created_by = models.UUIDField()
     validated_by = models.UUIDField(null=True, blank=True)
 
     class Meta:
-        db_table = "mouvements_stock"
-        verbose_name = "Mouvement de stock"
-        verbose_name_plural = "Mouvements de stock"
         ordering = ["-date_mouvement"]
 
     # ============================================================
-    # 💾 LOGIQUE DE SAUVEGARDE (gestion stock automatique)
+    # 🔥 LOGIQUE DE STOCK (corrigée)
     # ============================================================
     def save(self, *args, **kwargs):
         from stock.models import Stock
@@ -225,73 +216,55 @@ class MouvementStock(models.Model):
         if self.quantite <= 0:
             raise ValidationError("La quantité doit être positive.")
 
-        if self.type_mouvement == 'sortie' and self.magasin_source:
+        # ---- Vérification magasinier autorisé ----
+        if self.type_mouvement == 'sortie':
+            if not self.magasin_source:
+                raise ValidationError("Sortie doit avoir un magasin source.")
+
             if not self._verifier_autorisation_magasinier():
                 raise ValidationError("Le magasinier n'est pas autorisé à effectuer ce mouvement dans ce magasin.")
 
-        # Gestion du stock uniquement pour entrée, sortie et retour
-        if self.type_mouvement in ['entree', 'sortie', 'retour']:
-            if self.type_mouvement in ['entree', 'retour']:
-                if not self.magasin_dest:
-                    raise ValidationError("Entrée/Retour doit avoir un magasin destinataire.")
-                stock, _ = Stock.objects.get_or_create(article=self.article, magasin=self.magasin_dest)
-                stock.ajouter_quantite(self.quantite)
-            elif self.type_mouvement == 'sortie':
-                if not self.magasin_source:
-                    raise ValidationError("Sortie doit avoir un magasin source.")
-                stock = Stock.objects.filter(article=self.article, magasin=self.magasin_source).first()
-                if not stock or stock.quantite < self.quantite:
-                    raise ValidationError(f"Stock insuffisant dans le magasin {self.magasin_source.nom}")
-                stock.retirer_quantite(self.quantite)
+        # ---- Entrée / Retour ----
+        if self.type_mouvement in ['entree', 'retour']:
+            if not self.magasin_dest:
+                raise ValidationError("Entrée/Retour doit avoir un magasin destination.")
 
-        # Les transferts créés par le responsable ne modifient pas le stock
-        # Inventaire n'affecte pas le stock directement
+            stock, _ = Stock.objects.get_or_create(article=self.article, magasin=self.magasin_dest)
+            stock.ajouter_quantite(self.quantite)
+
+        # ---- Sortie ----
+        if self.type_mouvement == 'sortie':
+            stock = Stock.objects.filter(article=self.article, magasin=self.magasin_source).first()
+            if not stock or stock.quantite < self.quantite:
+                raise ValidationError(f"Stock insuffisant dans le magasin {self.magasin_source.nom}")
+
+            stock.retirer_quantite(self.quantite)
 
         super().save(*args, **kwargs)
 
     # ============================================================
-    # 🔍 MÉTHODES UTILITAIRES (API externes)
+    # 🔍 Vérifier autorisation magasinier (CORRIGÉ)
     # ============================================================
     def _verifier_autorisation_magasinier(self):
-        """Vérifie via AUTH_SERVICE si le magasinier appartient au magasin_source."""
         try:
             response = requests.get(f"{settings.AUTH_SERVICE_URL}/api/users/{self.magasinier_id}/")
             if response.status_code != 200:
                 return False
+
             user_data = response.json()
-            return str(user_data.get("magasin_id")) == str(self.magasin_source.id)
-        except requests.exceptions.RequestException:
-            return False
 
-    def get_magasinier_details(self):
-        """Retourne les détails du magasinier depuis AUTH_SERVICE."""
-        try:
-            response = requests.get(f"{settings.AUTH_SERVICE_URL}/api/users/{self.magasinier_id}/")
-            if response.status_code == 200:
-                return response.json()
-            return {"error": "Utilisateur introuvable"}
-        except requests.exceptions.RequestException:
-            return {"error": "Impossible de contacter auth_service"}
+            # 💥 Correction : ton API renvoie user["magasin"]["id"]
+            user_magasin_id = None
 
-    def get_recepteur_details(self):
-        """Retourne les détails du recepteur (employé ou magasin)."""
-        try:
-            if self.recepteur_type == 'employe':
-                url = f"{settings.RH_SERVICE_URL}/api/employes/{self.recepteur_id}/"
-            elif self.recepteur_type == 'magasin':
-                url = f"{settings.STOCK_SERVICE_URL}/api/magasins/{self.recepteur_id}/"
+            if isinstance(user_data.get("magasin"), dict):
+                user_magasin_id = str(user_data["magasin"].get("id"))
             else:
-                return None
+                user_magasin_id = str(user_data.get("magasin_id"))
 
-            response = requests.get(url)
-            if response.status_code == 200:
-                return response.json()
-            return {"error": f"Recepteur ({self.recepteur_type}) introuvable"}
-        except requests.exceptions.RequestException:
-            return {"error": "Impossible de contacter le service distant"}
+            return user_magasin_id == str(self.magasin_source_id)
 
-    def __str__(self):
-        return f"{self.type_mouvement.capitalize()} - {self.quantite} x {self.article.nom} ({self.date_mouvement.strftime('%Y-%m-%d %H:%M')})"
+        except Exception:
+            return False
 
 
 # =========================
