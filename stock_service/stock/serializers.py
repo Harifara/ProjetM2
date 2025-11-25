@@ -36,20 +36,16 @@ class ArticleSerializer(serializers.ModelSerializer):
 # Magasin
 # =========================
 class MagasinSerializer(serializers.ModelSerializer):
-    district_details = serializers.SerializerMethodField()
     district_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Magasin
         fields = "__all__"
 
-    def get_district_details(self, obj):
-        # Retourne juste l'ID du district pour éviter l'appel réseau
-        return {"id": str(obj.district_id)}
-
     def get_district_name(self, obj):
-        # Tu peux enrichir côté frontend comme tu fais actuellement
+        # On retourne juste l'ID ou "Nom manquant" côté frontend
         return "Nom manquant"
+
 
 # =========================
 # Stock

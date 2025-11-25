@@ -87,20 +87,14 @@ class MagasinViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        # 1️⃣ admin → tout
-        if user.role == "admin" or user.is_superuser:
+        if user.role in ["admin", "responsable_stock"] or user.is_superuser:
             return Magasin.objects.all()
-
-        # 2️⃣ responsable stock → tout
-        if user.role == "responsable_stock":
-            return Magasin.objects.all()
-
-        # 3️⃣ magasinier → uniquement SON magasin
         if user.role == "magasinier":
+            if not user.magasin_id:
+                return Magasin.objects.none()
             return Magasin.objects.filter(id=user.magasin_id)
-
-        # 4️⃣ les autres n’ont accès à rien
         return Magasin.objects.none()
+
 
 
 

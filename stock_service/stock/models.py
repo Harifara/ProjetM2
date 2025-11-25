@@ -68,8 +68,6 @@ class Magasin(models.Model):
     district_id = models.UUIDField(help_text="ID du district (depuis service RH)")
     capacite_max = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
     is_active = models.BooleanField(default=True)
-
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -82,25 +80,6 @@ class Magasin(models.Model):
     def __str__(self):
         return f"{self.nom} - District: {self.district_id}"
 
-  
-
-    def get_district_details(self):
-        """
-        Récupère les infos du district depuis le RH service.
-        """
-        import requests
-        from django.conf import settings
-
-        if not self.district_id:
-            return None
-
-        try:
-            response = requests.get(f"{settings.RH_SERVICE_URL}/api/districts/{self.district_id}/")
-            if response.status_code == 200:
-                return response.json()
-            return {"error": "District introuvable dans rh_service"}
-        except requests.exceptions.RequestException:
-            return {"error": "Impossible de contacter rh_service"}
 
 # =========================
 # Stock
