@@ -78,6 +78,11 @@ class ArticleViewSet(viewsets.ModelViewSet):
 # =========================
 # Magasins
 # =========================
+from rest_framework import viewsets, filters
+from .models import Magasin
+from .serializers import MagasinSerializer
+from .permissions import IsResponsableStockOrReadOnly, CanAccessOwnMagasinOnly
+
 class MagasinViewSet(viewsets.ModelViewSet):
     serializer_class = MagasinSerializer
     permission_classes = [IsResponsableStockOrReadOnly, CanAccessOwnMagasinOnly]
@@ -87,13 +92,20 @@ class MagasinViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        if user.role in ["admin", "responsable_stock"] or user.is_superuser:
+        # Admin et responsable_stock → accès total
+        if user.is_superuser or user.role in ["admin", "responsable_stock"]:
             return Magasin.objects.all()
+
+        # Magasinier → accès limité à son propre magasin
         if user.role == "magasinier":
-            if not user.magasin_id:
+            if not hasattr(user, "magasin_id") or not user.magasin_id:
                 return Magasin.objects.none()
-            return Magasin.objects.filter(id=user.magasin_id)
+            # Sécurité supplémentaire : assure-toi que l'ID est bien un int
+            return Magasin.objects.filter(id=int(user.magasin_id))
+
+        # Tous les autres → aucun accès
         return Magasin.objects.none()
+
 
 
 
