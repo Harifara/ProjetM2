@@ -7,6 +7,11 @@ from rest_framework.decorators import action
 from rest_framework import filters
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework import viewsets, filters
+from rest_framework.permissions import IsAuthenticated
+
+
+
 
 from django.core.exceptions import ValidationError
 from rest_framework.decorators import api_view
@@ -112,21 +117,14 @@ class MouvementStockViewSet(viewsets.ModelViewSet):
     serializer_class = MouvementStockSerializer
     permission_classes = [IsAuthenticated, IsResponsableStockOrMagasinier]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    
-    # Recherche sur le nom de l'article et des magasins
     search_fields = ['article__nom', 'magasin_source__nom', 'magasin_dest__nom']
     ordering_fields = ['date_mouvement', 'quantite', 'type_mouvement']
-    ordering = ['-date_mouvement']  # Ordre par défaut
+    ordering = ['-date_mouvement']
 
     def get_queryset(self):
-        """
-        Limite la vue aux mouvements du magasin de l'utilisateur si c'est un magasinier.
-        Les responsables peuvent voir tous les mouvements.
-        """
         user = self.request.user
         queryset = super().get_queryset()
-
-        if hasattr(user, 'magasin_id'):  # Si l'utilisateur est un magasinier
+        if hasattr(user, 'magasin_id'):
             queryset = queryset.filter(
                 models.Q(magasin_source_id=user.magasin_id) |
                 models.Q(magasin_dest_id=user.magasin_id)
