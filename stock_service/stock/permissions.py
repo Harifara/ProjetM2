@@ -56,26 +56,32 @@ class IsResponsableStockOrReadOnly(permissions.BasePermission):
 
 
 class CanAccessOwnMagasinOnly(permissions.BasePermission):
-    message = "Vous ne pouvez accéder qu'aux données de votre magasin."
+    message = "Vous ne pouvez accéder qu'aux données de votre propre magasin."
+
+    def has_permission(self, request, view):
+        return True  # DRF gère, mais get_queryset bloquera ce qui doit l'être
 
     def has_object_permission(self, request, view, obj):
         user = request.user
         role = getattr(user, "role", None)
 
-        # ✅ L’admin et le responsable stock peuvent tout voir
-        if role in ["admin", "responsable_stock"]:
+        # 1️⃣ Admin → accès total
+        if role == "admin" or user.is_superuser:
             return True
 
-        # 👤 Le magasinier ne peut voir que son propre magasin
+        # 2️⃣ Responsable stock → accès total aussi (il supervise tout)
+        if role == "responsable_stock":
+            return True
+
+        # 3️⃣ Magasinier → seulement son magasin
         if role == "magasinier":
-            magasinier_id = getattr(user, "id", None)
+            if not user.magasin_id:
+                return False
+            return str(obj.id) == str(user.magasin_id)
 
-            if hasattr(obj, 'magasin'):
-                return str(obj.magasin.magasinier_id) == str(magasinier_id)
-            if hasattr(obj, 'magasinier_id'):
-                return str(obj.magasinier_id) == str(magasinier_id)
-
+        # 4️⃣ Tous les autres rôles → accès interdit
         return False
+
 
 
 # ============================================================
