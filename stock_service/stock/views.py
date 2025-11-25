@@ -136,25 +136,27 @@ class MouvementStockViewSet(viewsets.ModelViewSet):
 class DemandeReapprovisionnementViewSet(viewsets.ModelViewSet):
     queryset = DemandeReapprovisionnement.objects.all()
     serializer_class = DemandeReapprovisionnementSerializer
-    permission_classes = [IsResponsableStockOrReadOnly]
+    permission_classes = [IsResponsableStockOrMagasinier]
 
-    # 🔹 Actions personnalisées pour valider/rejeter
+    def perform_create(self, serializer):
+        serializer.save(
+            numero=f"DR-{uuid.uuid4().hex[:8].upper()}",
+            demandeur_id=self.request.user.id
+        )
+
     @action(detail=True, methods=['post'], permission_classes=[IsResponsableStock])
     def valider(self, request, pk=None):
         obj = self.get_object()
-        responsable_id = getattr(request.user, "id", None)
-        obj.valider(responsable_stock_id=responsable_id)
-        serializer = self.get_serializer(obj)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        obj.valider(responsable_stock_id=request.user.id)
+        return Response(self.get_serializer(obj).data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsResponsableStock])
     def rejeter(self, request, pk=None):
         obj = self.get_object()
-        responsable_id = getattr(request.user, "id", None)
         commentaire = request.data.get("commentaire", "")
-        obj.rejeter(responsable_stock_id=responsable_id, commentaire=commentaire)
-        serializer = self.get_serializer(obj)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        obj.rejeter(responsable_stock_id=request.user.id, commentaire=commentaire)
+        return Response(self.get_serializer(obj).data)
+
 
 
 # =========================

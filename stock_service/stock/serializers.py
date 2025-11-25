@@ -166,9 +166,14 @@ class DemandeReapprovisionnementSerializer(serializers.ModelSerializer):
     magasin = MagasinSerializer(read_only=True)
     article = ArticleSerializer(read_only=True)
 
+    # champs pour écriture
+    magasin_id = serializers.UUIDField(write_only=True)
+    article_id = serializers.UUIDField(write_only=True)
+
     class Meta:
         model = DemandeReapprovisionnement
         fields = "__all__"
+
 
 # =========================
 # TransfertStock
