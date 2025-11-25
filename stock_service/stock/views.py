@@ -17,8 +17,7 @@ from django.core.exceptions import ValidationError
 from rest_framework.decorators import api_view
 from .models import (
     Categorie, Article, Magasin, Stock, MouvementStock,
-    DemandeReapprovisionnement, TransfertStock, DemandeAchat,
-    Inventaire, LigneInventaire
+    DemandeReapprovisionnement, TransfertStock, DemandeAchat
 )
 
 from .serializers import (
