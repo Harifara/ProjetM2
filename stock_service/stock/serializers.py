@@ -71,83 +71,91 @@ class StockSerializer(serializers.ModelSerializer):
 # MouvementStock
 # =========================
 class MouvementStockSerializer(serializers.ModelSerializer):
+    # Sérialisation read-only
     article = ArticleSerializer(read_only=True)
     magasin_source = MagasinSerializer(read_only=True)
     magasin_dest = MagasinSerializer(read_only=True)
 
-    article_id = serializers.UUIDField(write_only=True)
-    magasin_source_id = serializers.UUIDField(write_only=True, allow_null=True, required=False)
-    magasin_dest_id = serializers.UUIDField(write_only=True, allow_null=True, required=False)
+    # Champs write_only
+    article_id = serializers.UUIDField(write_only=True, required=True)
+    magasin_source_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    magasin_dest_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
 
     class Meta:
         model = MouvementStock
         fields = "__all__"
+        read_only_fields = ("magasinier_id", "created_by")
 
-    # ---------------------------------------------------------
-    # VALIDATION → Utilise les valeurs write_only
-    # ---------------------------------------------------------
-    def validate(self, attrs):
-        request_data = self.initial_data
-
-        type_mvt = request_data.get("type_mouvement")
-        src = request_data.get("magasin_source_id")
-        dst = request_data.get("magasin_dest_id")
-
-        if type_mvt == "entree" and not dst:
-            raise serializers.ValidationError({"magasin_dest_id": "Magasin destination requis pour une entrée."})
-
-        if type_mvt == "sortie" and not src:
-            raise serializers.ValidationError({"magasin_source_id": "Magasin source requis pour une sortie."})
-
-        if type_mvt == "retour" and not dst:
-            raise serializers.ValidationError({"magasin_dest_id": "Magasin destination requis pour un retour."})
-
-        if type_mvt == "transfert":
-            if not src:
-                raise serializers.ValidationError({"magasin_source_id": "Magasin source requis pour un transfert."})
-            if not dst:
-                raise serializers.ValidationError({"magasin_dest_id": "Magasin destination requis pour un transfert."})
-
-        return attrs
-
-    # ---------------------------------------------------------
-    # CREATE
-    # ---------------------------------------------------------
     def create(self, validated_data):
-        data = self.initial_data
+        request = self.context.get("request")
+        user = request.user
 
-        validated_data["article"] = Article.objects.get(id=data["article_id"])
-        validated_data["magasin_source"] = (
-            Magasin.objects.get(id=data["magasin_source_id"])
-            if data.get("magasin_source_id") else None
-        )
-        validated_data["magasin_dest"] = (
-            Magasin.objects.get(id=data["magasin_dest_id"])
-            if data.get("magasin_dest_id") else None
-        )
+        # Associer automatiquement
+        validated_data["magasinier_id"] = user.id
+        validated_data["created_by"] = user.id
+
+        # Extraire IDs
+        article_id = validated_data.pop('article_id')
+        magasin_source_id = validated_data.pop('magasin_source_id', None)
+        magasin_dest_id = validated_data.pop('magasin_dest_id', None)
+
+        # ARTICLE
+        try:
+            validated_data['article'] = Article.objects.get(id=article_id)
+        except Article.DoesNotExist:
+            raise serializers.ValidationError({"article_id": "Article introuvable."})
+
+        # MAGASIN SOURCE
+        if magasin_source_id:
+            try:
+                validated_data['magasin_source'] = Magasin.objects.get(id=magasin_source_id)
+            except Magasin.DoesNotExist:
+                raise serializers.ValidationError({"magasin_source_id": "Magasin source introuvable."})
+        else:
+            validated_data['magasin_source'] = None
+
+        # MAGASIN DEST
+        if magasin_dest_id:
+            try:
+                validated_data['magasin_dest'] = Magasin.objects.get(id=magasin_dest_id)
+            except Magasin.DoesNotExist:
+                raise serializers.ValidationError({"magasin_dest_id": "Magasin destination introuvable."})
+        else:
+            validated_data['magasin_dest'] = None
 
         return super().create(validated_data)
 
-    # ---------------------------------------------------------
-    # UPDATE
-    # ---------------------------------------------------------
     def update(self, instance, validated_data):
-        data = self.initial_data
+        article_id = validated_data.pop("article_id", None)
+        magasin_source_id = validated_data.pop("magasin_source_id", None)
+        magasin_dest_id = validated_data.pop("magasin_dest_id", None)
 
-        if "article_id" in data:
-            instance.article = Article.objects.get(id=data["article_id"])
+        # UPDATE ARTICLE
+        if article_id:
+            try:
+                instance.article = Article.objects.get(id=article_id)
+            except Article.DoesNotExist:
+                raise serializers.ValidationError({"article_id": "Article introuvable."})
 
-        if "magasin_source_id" in data:
-            instance.magasin_source = (
-                Magasin.objects.get(id=data["magasin_source_id"])
-                if data["magasin_source_id"] else None
-            )
+        # UPDATE MAGASIN SOURCE
+        if magasin_source_id is not None:
+            if magasin_source_id == "":
+                instance.magasin_source = None
+            else:
+                try:
+                    instance.magasin_source = Magasin.objects.get(id=magasin_source_id)
+                except Magasin.DoesNotExist:
+                    raise serializers.ValidationError({"magasin_source_id": "Magasin source introuvable."})
 
-        if "magasin_dest_id" in data:
-            instance.magasin_dest = (
-                Magasin.objects.get(id=data["magasin_dest_id"])
-                if data["magasin_dest_id"] else None
-            )
+        # UPDATE MAGASIN DEST
+        if magasin_dest_id is not None:
+            if magasin_dest_id == "":
+                instance.magasin_dest = None
+            else:
+                try:
+                    instance.magasin_dest = Magasin.objects.get(id=magasin_dest_id)
+                except Magasin.DoesNotExist:
+                    raise serializers.ValidationError({"magasin_dest_id": "Magasin destination introuvable."})
 
         return super().update(instance, validated_data)
 
