@@ -163,16 +163,44 @@ class MouvementStockSerializer(serializers.ModelSerializer):
 # DemandeReapprovisionnement
 # =========================
 class DemandeReapprovisionnementSerializer(serializers.ModelSerializer):
+    # lecture détaillée
     magasin = MagasinSerializer(read_only=True)
     article = ArticleSerializer(read_only=True)
 
-    # champs pour écriture
-    magasin_id = serializers.UUIDField(write_only=True)
-    article_id = serializers.UUIDField(write_only=True)
+    # écriture : on attend les PK (UUID) pour associer
+    magasin_id = serializers.PrimaryKeyRelatedField(
+        queryset=Magasin.objects.all(), source="magasin", write_only=True
+    )
+    article_id = serializers.PrimaryKeyRelatedField(
+        queryset=Article.objects.all(), source="article", write_only=True
+    )
+
+    # le demandeur et le validateur sont fournis/assignés par le backend → read_only
+    demandeur_id = serializers.UUIDField(read_only=True)
+    validateur_id = serializers.UUIDField(read_only=True)
 
     class Meta:
         model = DemandeReapprovisionnement
-        fields = "__all__"
+        fields = [
+            "id",
+            "numero",
+            "magasin",
+            "article",
+            "magasin_id",
+            "article_id",
+            "quantite_demandee",
+            "quantite_approuvee",
+            "motif",
+            "statut",
+            "priorite",
+            "demandeur_id",
+            "validateur_id",
+            "date_validation",
+            "commentaire_validation",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "numero", "quantite_approuvee", "statut", "date_validation", "created_at", "updated_at"]
 
 
 # =========================
