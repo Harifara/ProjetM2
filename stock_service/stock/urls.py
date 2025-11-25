@@ -12,8 +12,6 @@ from .views import (
     DemandeReapprovisionnementViewSet,
     TransfertStockViewSet,
     DemandeAchatViewSet,
-    InventaireViewSet,
-    LigneInventaireViewSet,
     ajouter_stock, retirer_stock  # endpoint personnalisé
 )
 
@@ -26,8 +24,7 @@ router.register(r'mouvements-stock', MouvementStockViewSet, basename='mouvement-
 router.register(r'demandes-reapprovisionnement', DemandeReapprovisionnementViewSet, basename='demande-reappro')
 router.register(r'demandes-achat', DemandeAchatViewSet, basename='demande-achat')
 router.register(r'transferts-stock', TransfertStockViewSet, basename='transfert-stock')
-router.register(r'inventaires', InventaireViewSet, basename='inventaire')
-router.register(r'lignes-inventaire', LigneInventaireViewSet, basename='ligne-inventaire')
+
 
 urlpatterns = [
     path('', include(router.urls)),

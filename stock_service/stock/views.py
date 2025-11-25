@@ -24,7 +24,7 @@ from .models import (
 from .serializers import (
     CategorieSerializer, ArticleSerializer, MagasinSerializer, StockSerializer,
     MouvementStockSerializer, DemandeReapprovisionnementSerializer, TransfertStockSerializer,
-    DemandeAchatSerializer, InventaireSerializer, LigneInventaireSerializer
+    DemandeAchatSerializer
 )
 
 from .permissions import (
@@ -199,24 +199,3 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(obj)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-
-# =========================
-# Inventaire et LigneInventaire
-# =========================
-class LigneInventaireViewSet(viewsets.ModelViewSet):
-    queryset = LigneInventaire.objects.all()
-    serializer_class = LigneInventaireSerializer
-    permission_classes = [IsResponsableStockOrMagasinier]
-
-
-class InventaireViewSet(viewsets.ModelViewSet):
-    queryset = Inventaire.objects.all()
-    serializer_class = InventaireSerializer
-    permission_classes = [IsResponsableStockOrMagasinier]
-
-    def get_queryset(self):
-        user = self.request.user
-        role = getattr(user, "role", None)
-        if role == "magasinier":
-            return self.queryset.filter(magasin__magasinier_id=user.id)
-        return self.queryset

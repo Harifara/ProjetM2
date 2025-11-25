@@ -1,8 +1,7 @@
 from rest_framework import serializers
 from .models import (
     Categorie, Article, Magasin, Stock, MouvementStock,
-    DemandeReapprovisionnement, TransfertStock, DemandeAchat,
-    Inventaire, LigneInventaire
+    DemandeReapprovisionnement, TransfertStock, DemandeAchat
 )
 
 # =========================
@@ -87,32 +86,63 @@ class MouvementStockSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
     def create(self, validated_data):
-        # Pop les champs write-only
         article_id = validated_data.pop('article_id')
         magasin_source_id = validated_data.pop('magasin_source_id', None)
         magasin_dest_id = validated_data.pop('magasin_dest_id', None)
 
-        # Associer les objets ForeignKey
-        from stock.models import Article, Magasin
-        validated_data['article'] = Article.objects.get(id=article_id)
-        validated_data['magasin_source'] = Magasin.objects.get(id=magasin_source_id) if magasin_source_id else None
-        validated_data['magasin_dest'] = Magasin.objects.get(id=magasin_dest_id) if magasin_dest_id else None
+        # Associer les objets ForeignKey avec validation
+        try:
+            validated_data['article'] = Article.objects.get(id=article_id)
+        except ObjectDoesNotExist:
+            raise serializers.ValidationError({"article_id": "Article introuvable."})
+
+        if magasin_source_id:
+            try:
+                validated_data['magasin_source'] = Magasin.objects.get(id=magasin_source_id)
+            except ObjectDoesNotExist:
+                raise serializers.ValidationError({"magasin_source_id": "Magasin source introuvable."})
+        else:
+            validated_data['magasin_source'] = None
+
+        if magasin_dest_id:
+            try:
+                validated_data['magasin_dest'] = Magasin.objects.get(id=magasin_dest_id)
+            except ObjectDoesNotExist:
+                raise serializers.ValidationError({"magasin_dest_id": "Magasin destination introuvable."})
+        else:
+            validated_data['magasin_dest'] = None
 
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        # Même logique que create pour update
         article_id = validated_data.pop('article_id', None)
         magasin_source_id = validated_data.pop('magasin_source_id', None)
         magasin_dest_id = validated_data.pop('magasin_dest_id', None)
 
-        from stock.models import Article, Magasin
+        # Mise à jour sécurisée des relations
         if article_id:
-            instance.article = Article.objects.get(id=article_id)
+            try:
+                instance.article = Article.objects.get(id=article_id)
+            except ObjectDoesNotExist:
+                raise serializers.ValidationError({"article_id": "Article introuvable."})
+
         if magasin_source_id is not None:
-            instance.magasin_source = Magasin.objects.get(id=magasin_source_id)
+            if magasin_source_id == "":
+                instance.magasin_source = None
+            else:
+                try:
+                    instance.magasin_source = Magasin.objects.get(id=magasin_source_id)
+                except ObjectDoesNotExist:
+                    raise serializers.ValidationError({"magasin_source_id": "Magasin source introuvable."})
+
         if magasin_dest_id is not None:
-            instance.magasin_dest = Magasin.objects.get(id=magasin_dest_id)
+            if magasin_dest_id == "":
+                instance.magasin_dest = None
+            else:
+                try:
+                    instance.magasin_dest = Magasin.objects.get(id=magasin_dest_id)
+                except ObjectDoesNotExist:
+                    raise serializers.ValidationError({"magasin_dest_id": "Magasin destination introuvable."})
 
         return super().update(instance, validated_data)
 
@@ -149,23 +179,4 @@ class DemandeAchatSerializer(serializers.ModelSerializer):
         model = DemandeAchat
         fields = "__all__"
 
-# =========================
-# LigneInventaire
-# =========================
-class LigneInventaireSerializer(serializers.ModelSerializer):
-    article = ArticleSerializer(read_only=True)
 
-    class Meta:
-        model = LigneInventaire
-        fields = "__all__"
-
-# =========================
-# Inventaire
-# =========================
-class InventaireSerializer(serializers.ModelSerializer):
-    magasin = MagasinSerializer(read_only=True)
-    lignes = LigneInventaireSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = Inventaire
-        fields = "__all__"

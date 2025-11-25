@@ -160,7 +160,6 @@ class MouvementStock(models.Model):
         ('sortie', 'Sortie'),
         ('retour', 'Retour'),
         ('transfert', 'Transfert'),
-        ('inventaire', 'Inventaire'),
     ]
 
     STATUT_CHOICES = [
@@ -540,86 +539,3 @@ class DemandeReapprovisionnement(models.Model):
     def __str__(self):
         return f"{self.numero} - {self.article.nom} ({self.statut})"
 
-
-# =========================
-# Inventaire
-# =========================
-class Inventaire(models.Model):
-    STATUS_CHOICES = [
-        ('en_cours', 'En cours'),
-        ('valide', 'Validé'),
-        ('rejete', 'Rejeté')
-    ]
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    magasin = models.ForeignKey(Magasin, on_delete=models.PROTECT, related_name='inventaires')
-    date_inventaire = models.DateTimeField(default=timezone.now)
-
-    # 🔹 UUID du responsable de l’inventaire (magasinier)
-    responsable_id = models.UUIDField(help_text="UUID du magasinier qui réalise l'inventaire")
-
-    commentaire = models.TextField(blank=True, null=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_cours')
-    date_validation = models.DateTimeField(blank=True, null=True)
-
-    # 🔹 UUID du valideur (responsable stock)
-    valideur_id = models.UUIDField(null=True, blank=True, help_text="UUID du responsable stock qui valide l'inventaire")
-
-    class Meta:
-        db_table = 'inventaires'
-        verbose_name = 'Inventaire'
-        verbose_name_plural = 'Inventaires'
-        ordering = ['-date_inventaire']
-
-    # ------------------------
-    # Méthode pour valider l'inventaire
-    # ------------------------
-    def valider(self, responsable_stock_id: uuid.UUID):
-        if self.status != 'en_cours':
-            raise ValidationError("Inventaire déjà validé ou rejeté.")
-
-        # Mettre à jour le stock réel uniquement lors de la validation
-        for ligne in self.lignes.all():
-            stock, _ = Stock.objects.get_or_create(article=ligne.article, magasin=self.magasin)
-            stock.quantite = ligne.quantite_comptée
-            stock.save()
-            ligne.quantite_stock = stock.quantite
-            ligne.ecart = ligne.quantite_comptée - stock.quantite
-            ligne.save()
-
-        self.status = 'valide'
-        self.valideur_id = responsable_stock_id
-        self.date_validation = timezone.now()
-        self.save()
-
-    def rejeter(self, responsable_stock_id: uuid.UUID, commentaire: str = ''):
-        if self.status != 'en_cours':
-            raise ValidationError("Inventaire déjà validé ou rejeté.")
-        self.status = 'rejete'
-        self.valideur_id = responsable_stock_id
-        self.commentaire = commentaire
-        self.date_validation = timezone.now()
-        self.save()
-
-    def __str__(self):
-        return f"Inventaire {self.id} - {self.magasin.nom} ({self.date_inventaire.date()})"
-
-
-# =========================
-# LigneInventaire
-# =========================
-class LigneInventaire(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    inventaire = models.ForeignKey(Inventaire, on_delete=models.CASCADE, related_name='lignes')
-    article = models.ForeignKey(Article, on_delete=models.PROTECT)
-    quantite_comptée = models.IntegerField()
-    quantite_stock = models.IntegerField(default=0)
-    ecart = models.IntegerField(blank=True, null=True)
-
-    def save(self, *args, **kwargs):
-        # Calculer l'écart mais ne pas toucher au stock réel avant validation
-        self.ecart = self.quantite_comptée - self.quantite_stock
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"{self.article.nom}: compté {self.quantite_comptée}, stock {self.quantite_stock}, écart {self.ecart}"
