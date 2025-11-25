@@ -147,6 +147,13 @@ class Stock(models.Model):
 # =========================
 # MouvementStock
 # =========================
+import uuid
+import requests
+from django.db import models
+from django.core.exceptions import ValidationError
+from django.utils import timezone
+from django.conf import settings
+
 class MouvementStock(models.Model):
     TYPE_MOUVEMENT_CHOICES = [
         ('entree', 'Entrée'),
@@ -156,35 +163,53 @@ class MouvementStock(models.Model):
         ('inventaire', 'Inventaire'),
     ]
 
+    STATUT_CHOICES = [
+        ('brouillon', 'Brouillon'),
+        ('valide', 'Validé'),
+        ('annule', 'Annulé'),
+    ]
+
+    RECEPTEUR_CHOICES = [
+        ('employe', 'Employé (depuis RH)'),
+        ('magasin', 'Magasin'),
+        ('autre', 'Autre'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     article = models.ForeignKey("Article", on_delete=models.PROTECT, related_name="mouvements")
+    
+    # Magasins source et destination
     magasin_source = models.ForeignKey(
         "Magasin", null=True, blank=True, on_delete=models.PROTECT, related_name="mouvements_sortie"
     )
     magasin_dest = models.ForeignKey(
         "Magasin", null=True, blank=True, on_delete=models.PROTECT, related_name="mouvements_entree"
     )
-    quantite = models.IntegerField()
+
+    quantite = models.PositiveIntegerField()
     type_mouvement = models.CharField(max_length=20, choices=TYPE_MOUVEMENT_CHOICES)
-
-    # 🔗 magasinier = utilisateur dans AUTH_SERVICE (UUID)
+    
+    # Magasinier et recepteur
     magasinier_id = models.UUIDField(help_text="ID du magasinier (depuis auth_service)")
-
-    # 🔗 recepteur (peut être un employé ou un autre magasin)
     recepteur_id = models.UUIDField(null=True, blank=True, help_text="ID du recepteur (employé ou magasin)")
-    recepteur_type = models.CharField(
-        max_length=50,
-        choices=[
-            ('employe', 'Employé (depuis RH)'),
-            ('magasin', 'Magasin'),
-            ('autre', 'Autre'),
-        ],
-        default='magasin'
-    )
+    recepteur_type = models.CharField(max_length=50, choices=RECEPTEUR_CHOICES, default='magasin')
 
+    # Transport, commentaire, référence
     transporteur = models.CharField(max_length=255, blank=True, null=True)
     commentaire = models.TextField(blank=True, null=True)
+    reference = models.CharField(max_length=100, blank=True, null=True)
+
+    # Statut et dates
+    statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='valide')
     date_mouvement = models.DateTimeField(default=timezone.now)
+    date_validation = models.DateTimeField(null=True, blank=True)
+
+    # Pour lier les transferts
+    transfert_id = models.UUIDField(null=True, blank=True)
+
+    # Traçabilité
+    created_by = models.UUIDField()
+    validated_by = models.UUIDField(null=True, blank=True)
 
     class Meta:
         db_table = "mouvements_stock"
@@ -201,7 +226,6 @@ class MouvementStock(models.Model):
         if self.quantite <= 0:
             raise ValidationError("La quantité doit être positive.")
 
-        # Vérification droits magasinier
         if self.type_mouvement == 'sortie' and self.magasin_source:
             if not self._verifier_autorisation_magasinier():
                 raise ValidationError("Le magasinier n'est pas autorisé à effectuer ce mouvement dans ce magasin.")
@@ -213,7 +237,6 @@ class MouvementStock(models.Model):
                     raise ValidationError("Entrée/Retour doit avoir un magasin destinataire.")
                 stock, _ = Stock.objects.get_or_create(article=self.article, magasin=self.magasin_dest)
                 stock.ajouter_quantite(self.quantite)
-
             elif self.type_mouvement == 'sortie':
                 if not self.magasin_source:
                     raise ValidationError("Sortie doit avoir un magasin source.")
@@ -227,15 +250,11 @@ class MouvementStock(models.Model):
 
         super().save(*args, **kwargs)
 
-
     # ============================================================
     # 🔍 MÉTHODES UTILITAIRES (API externes)
     # ============================================================
-
     def _verifier_autorisation_magasinier(self):
-        """
-        Vérifie via AUTH_SERVICE si le magasinier appartient au magasin_source.
-        """
+        """Vérifie via AUTH_SERVICE si le magasinier appartient au magasin_source."""
         try:
             response = requests.get(f"{settings.AUTH_SERVICE_URL}/api/users/{self.magasinier_id}/")
             if response.status_code != 200:
@@ -273,7 +292,8 @@ class MouvementStock(models.Model):
             return {"error": "Impossible de contacter le service distant"}
 
     def __str__(self):
-        return f"{self.type_mouvement.capitalize()} - {self.quantite} x {self.article.nom}"
+        return f"{self.type_mouvement.capitalize()} - {self.quantite} x {self.article.nom} ({self.date_mouvement.strftime('%Y-%m-%d %H:%M')})"
+
 
 # =========================
 # DemandeReapprovisionnement

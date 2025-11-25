@@ -110,11 +110,28 @@ class StockViewSet(viewsets.ModelViewSet):
 class MouvementStockViewSet(viewsets.ModelViewSet):
     queryset = MouvementStock.objects.all()
     serializer_class = MouvementStockSerializer
-    permission_classes = [IsResponsableStockOrMagasinier]
-    filter_backends = [SearchFilter, OrderingFilter]  # <-- liste obligatoire
+    permission_classes = [IsAuthenticated, IsResponsableStockOrMagasinier]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    
+    # Recherche sur le nom de l'article et des magasins
     search_fields = ['article__nom', 'magasin_source__nom', 'magasin_dest__nom']
-    ordering_fields = ['date_mouvement']
+    ordering_fields = ['date_mouvement', 'quantite', 'type_mouvement']
+    ordering = ['-date_mouvement']  # Ordre par défaut
 
+    def get_queryset(self):
+        """
+        Limite la vue aux mouvements du magasin de l'utilisateur si c'est un magasinier.
+        Les responsables peuvent voir tous les mouvements.
+        """
+        user = self.request.user
+        queryset = super().get_queryset()
+
+        if hasattr(user, 'magasin_id'):  # Si l'utilisateur est un magasinier
+            queryset = queryset.filter(
+                models.Q(magasin_source_id=user.magasin_id) |
+                models.Q(magasin_dest_id=user.magasin_id)
+            )
+        return queryset
 
 # =========================
 # DemandeReapprovisionnement
