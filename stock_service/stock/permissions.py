@@ -15,11 +15,10 @@ def has_role(user, roles):
         user
         and user.is_authenticated
         and (
-            getattr(user, "role", None) == "admin"  # ✅ Admin a toujours accès
+            getattr(user, "role", None) == "admin"
             or getattr(user, "role", None) in roles
         )
     )
-
 
 # ============================================================
 # 🧱 Permissions spécifiques au module Stock
@@ -59,38 +58,33 @@ class CanAccessOwnMagasinOnly(permissions.BasePermission):
     message = "Vous ne pouvez accéder qu'aux données de votre propre magasin."
 
     def has_permission(self, request, view):
-        return True  # DRF gère, mais get_queryset bloquera ce qui doit l'être
+        # pour les listes, on laisse passer : get_queryset filtre après
+        return True
 
     def has_object_permission(self, request, view, obj):
         user = request.user
         role = getattr(user, "role", None)
 
-        # 1️⃣ Admin → accès total
+        # admin → accès total
         if role == "admin" or user.is_superuser:
             return True
 
-        # 2️⃣ Responsable stock → accès total aussi (il supervise tout)
+        # responsable_stock → accès total
         if role == "responsable_stock":
             return True
 
-        # 3️⃣ Magasinier → seulement son magasin
+        # magasinier → accès limité à son magasin
         if role == "magasinier":
             if not user.magasin_id:
                 return False
             return str(obj.id) == str(user.magasin_id)
 
-        # 4️⃣ Tous les autres rôles → accès interdit
         return False
 
 
-
-# ============================================================
-# 🧩 Permission optionnelle : Admin ou Responsable de stock
-# ============================================================
 class IsAdminOrResponsableStock(permissions.BasePermission):
     """
-    Autorise les administrateurs ou les responsables de stock.
-    Utile pour certaines routes critiques.
+    Autorise uniquement admin ou responsable de stock.
     """
     message = "Accès réservé aux administrateurs ou responsables de stock."
 
