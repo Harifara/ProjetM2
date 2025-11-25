@@ -36,16 +36,9 @@ class ArticleSerializer(serializers.ModelSerializer):
 # Magasin
 # =========================
 class MagasinSerializer(serializers.ModelSerializer):
-    district_name = serializers.SerializerMethodField()
-
     class Meta:
         model = Magasin
         fields = "__all__"
-
-    def get_district_name(self, obj):
-        # On retourne juste l'ID ou "Nom manquant" côté frontend
-        return "Nom manquant"
-
 
 # =========================
 # Stock

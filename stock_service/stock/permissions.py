@@ -15,10 +15,11 @@ def has_role(user, roles):
         user
         and user.is_authenticated
         and (
-            getattr(user, "role", None) == "admin"
+            getattr(user, "role", None) == "admin"  # ✅ Admin a toujours accès
             or getattr(user, "role", None) in roles
         )
     )
+
 
 # ============================================================
 # 🧱 Permissions spécifiques au module Stock
@@ -55,36 +56,35 @@ class IsResponsableStockOrReadOnly(permissions.BasePermission):
 
 
 class CanAccessOwnMagasinOnly(permissions.BasePermission):
-    message = "Vous ne pouvez accéder qu'aux données de votre propre magasin."
-
-    def has_permission(self, request, view):
-        # pour les listes, on laisse passer : get_queryset filtre après
-        return True
+    message = "Vous ne pouvez accéder qu'aux données de votre magasin."
 
     def has_object_permission(self, request, view, obj):
         user = request.user
         role = getattr(user, "role", None)
 
-        # admin → accès total
-        if role == "admin" or user.is_superuser:
+        # ✅ L’admin et le responsable stock peuvent tout voir
+        if role in ["admin", "responsable_stock"]:
             return True
 
-        # responsable_stock → accès total
-        if role == "responsable_stock":
-            return True
-
-        # magasinier → accès limité à son magasin
+        # 👤 Le magasinier ne peut voir que son propre magasin
         if role == "magasinier":
-            if not user.magasin_id:
-                return False
-            return str(obj.id) == str(user.magasin_id)
+            magasinier_id = getattr(user, "id", None)
+
+            if hasattr(obj, 'magasin'):
+                return str(obj.magasin.magasinier_id) == str(magasinier_id)
+            if hasattr(obj, 'magasinier_id'):
+                return str(obj.magasinier_id) == str(magasinier_id)
 
         return False
 
 
+# ============================================================
+# 🧩 Permission optionnelle : Admin ou Responsable de stock
+# ============================================================
 class IsAdminOrResponsableStock(permissions.BasePermission):
     """
-    Autorise uniquement admin ou responsable de stock.
+    Autorise les administrateurs ou les responsables de stock.
+    Utile pour certaines routes critiques.
     """
     message = "Accès réservé aux administrateurs ou responsables de stock."
 
