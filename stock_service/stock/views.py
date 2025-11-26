@@ -142,6 +142,9 @@ class DemandeReapprovisionnementViewSet(viewsets.ModelViewSet):
     serializer_class = DemandeReapprovisionnementSerializer
     permission_classes = [IsAuthenticated]
 
+    # ⚠️ Assurez-vous que filter_backends est une liste (vide si pas besoin)
+    filter_backends = []  # OU [filters.SearchFilter, filters.OrderingFilter] si vous utilisez
+
     def list(self, request, *args, **kwargs):
         logger.info("[GET] Début récupération demandes")
         try:
