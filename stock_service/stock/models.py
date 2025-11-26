@@ -294,9 +294,6 @@ class MouvementStock(models.Model):
         return f"{self.type_mouvement.capitalize()} - {self.quantite} x {self.article.nom} ({self.date_mouvement.strftime('%Y-%m-%d %H:%M')})"
 
 
-# =========================
-# DemandeReapprovisionnement
-# =========================
 class DemandeReapprovisionnement(models.Model):
     STATUS_CHOICES = [
         ('en_attente', 'En attente'),
@@ -320,7 +317,6 @@ class DemandeReapprovisionnement(models.Model):
     statut = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente')
     priorite = models.CharField(max_length=20, choices=PRIORITE_CHOICES, default='normale')
 
-    # 🔹 UUID des utilisateurs (auth_service)
     demandeur_id = models.UUIDField(help_text="UUID du magasinier connecté")
     validateur_id = models.UUIDField(null=True, blank=True, help_text="UUID du responsable stock")
 
@@ -335,7 +331,6 @@ class DemandeReapprovisionnement(models.Model):
         verbose_name_plural = 'Demandes de réapprovisionnement'
         ordering = ['-created_at']
 
-    # 🔹 Méthodes
     def valider(self, responsable_stock_id: uuid.UUID):
         self.statut = 'approuve'
         self.validateur_id = responsable_stock_id
