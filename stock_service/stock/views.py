@@ -177,7 +177,7 @@ class DemandeReapprovisionnementViewSet(viewsets.ModelViewSet):
         try:
             obj = self.get_object()
             responsable_id = getattr(request.user, "id", None)
-            commentaire = request.data.get("commentaire", "")
+            commentaire = request.data.get("commentaire_validation", "")
             obj.rejeter(responsable_stock_id=responsable_id, commentaire=commentaire)
             serializer = self.get_serializer(obj)
             logger.info(f"[POST] Demande {obj.numero} rejetée par {responsable_id}")

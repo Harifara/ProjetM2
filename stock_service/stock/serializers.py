@@ -167,6 +167,7 @@ class DemandeReapprovisionnementSerializer(serializers.ModelSerializer):
     magasin = MagasinSerializer(read_only=True, allow_null=True)
     article = ArticleSerializer(read_only=True, allow_null=True)
 
+    # Pour créer une demande via POST
     magasin_id = serializers.PrimaryKeyRelatedField(
         queryset=Magasin.objects.all(),
         source="magasin",
