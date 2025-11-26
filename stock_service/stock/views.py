@@ -134,19 +134,12 @@ class MouvementStockViewSet(viewsets.ModelViewSet):
 # DemandeReapprovisionnement
 # =========================
 class DemandeReapprovisionnementViewSet(viewsets.ModelViewSet):
-    queryset = DemandeReapprovisionnement.objects.select_related("magasin", "article").all()
+    queryset = DemandeReapprovisionnement.objects.all()
     serializer_class = DemandeReapprovisionnementSerializer
     permission_classes = [IsAuthenticated]
 
-
     def perform_create(self, serializer):
-        """
-        On génère le numero ici et on définit le demandeur_id depuis request.user.
-        Le serializer attend magasin_id / article_id (write_only) et fera l'association.
-        """
-        # génère un numéro lisible unique (tu peux changer le format)
         numero = f"DR-{uuid.uuid4().hex[:8].upper()}"
-        # on suppose que request.user.id est un UUID (adapte si c'est un int)
         demandeur_id = getattr(self.request.user, "id", None)
         serializer.save(numero=numero, demandeur_id=demandeur_id)
 
@@ -155,7 +148,7 @@ class DemandeReapprovisionnementViewSet(viewsets.ModelViewSet):
         obj = self.get_object()
         responsable_id = getattr(request.user, "id", None)
         obj.valider(responsable_stock_id=responsable_id)
-        serializer = self.get_serializer(obj)
+        serializer = self.get_serializer(obj, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], permission_classes=[IsResponsableStock])
@@ -164,9 +157,8 @@ class DemandeReapprovisionnementViewSet(viewsets.ModelViewSet):
         responsable_id = getattr(request.user, "id", None)
         commentaire = request.data.get("commentaire", "")
         obj.rejeter(responsable_stock_id=responsable_id, commentaire=commentaire)
-        serializer = self.get_serializer(obj)
+        serializer = self.get_serializer(obj, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
-
 
 
 # =========================

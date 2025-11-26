@@ -162,17 +162,22 @@ class MouvementStockSerializer(serializers.ModelSerializer):
 # =========================
 # DemandeReapprovisionnement
 # =========================
+
 class DemandeReapprovisionnementSerializer(serializers.ModelSerializer):
-    # lecture détaillée
-    magasin = MagasinSerializer(read_only=True)
-    article = ArticleSerializer(read_only=True)
+    # lecture safe
+    magasin = MagasinSerializer(read_only=True, allow_null=True)
+    article = ArticleSerializer(read_only=True, allow_null=True)
 
     # écriture : on attend les PK (UUID) pour associer
     magasin_id = serializers.PrimaryKeyRelatedField(
-        queryset=Magasin.objects.all(), source="magasin", write_only=True
+        queryset=Magasin.objects.all(),
+        source="magasin",
+        write_only=True
     )
     article_id = serializers.PrimaryKeyRelatedField(
-        queryset=Article.objects.all(), source="article", write_only=True
+        queryset=Article.objects.all(),
+        source="article",
+        write_only=True
     )
 
     # le demandeur et le validateur sont fournis/assignés par le backend → read_only
@@ -200,8 +205,15 @@ class DemandeReapprovisionnementSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "numero", "quantite_approuvee", "statut", "date_validation", "created_at", "updated_at"]
-
+        read_only_fields = [
+            "id",
+            "numero",
+            "quantite_approuvee",
+            "statut",
+            "date_validation",
+            "created_at",
+            "updated_at",
+        ]
 
 # =========================
 # TransfertStock
