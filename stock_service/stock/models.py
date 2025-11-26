@@ -295,6 +295,7 @@ class MouvementStock(models.Model):
 
 
 class DemandeReapprovisionnement(models.Model):
+    # ... tes champs existants
     STATUS_CHOICES = [
         ('en_attente', 'En attente'),
         ('approuve', 'Approuvé'),
@@ -306,20 +307,17 @@ class DemandeReapprovisionnement(models.Model):
         ('haute', 'Haute'),
         ('urgente', 'Urgente')
     ]
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     numero = models.CharField(max_length=100, unique=True)
-    magasin = models.ForeignKey(Magasin, on_delete=models.PROTECT, related_name='demandes_reappro')
-    article = models.ForeignKey(Article, on_delete=models.PROTECT, related_name='demandes_reappro')
+    magasin = models.ForeignKey('Magasin', on_delete=models.PROTECT, related_name='demandes_reappro')
+    article = models.ForeignKey('Article', on_delete=models.PROTECT, related_name='demandes_reappro')
     quantite_demandee = models.IntegerField()
     quantite_approuvee = models.IntegerField(null=True, blank=True)
     motif = models.TextField()
     statut = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente')
     priorite = models.CharField(max_length=20, choices=PRIORITE_CHOICES, default='normale')
-
     demandeur_id = models.UUIDField(help_text="UUID du magasinier connecté")
     validateur_id = models.UUIDField(null=True, blank=True, help_text="UUID du responsable stock")
-
     date_validation = models.DateTimeField(null=True, blank=True)
     commentaire_validation = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -331,6 +329,9 @@ class DemandeReapprovisionnement(models.Model):
         verbose_name_plural = 'Demandes de réapprovisionnement'
         ordering = ['-created_at']
 
+    # ------------------------
+    # Valider / Rejeter simples
+    # ------------------------
     def valider(self, responsable_stock_id: uuid.UUID):
         self.statut = 'approuve'
         self.validateur_id = responsable_stock_id
@@ -344,6 +345,55 @@ class DemandeReapprovisionnement(models.Model):
         self.date_validation = timezone.now()
         self.commentaire_validation = commentaire
         self.save()
+
+    # ------------------------
+    # 🔹 Vérifier stock autres magasins
+    # ------------------------
+    def verifier_stock_autres_magasins(self):
+        """
+        Retourne une QuerySet des stocks disponibles dans d'autres magasins pour cet article
+        """
+        return Stock.objects.filter(
+            article=self.article,
+            quantite__gte=self.quantite_demandee
+        ).exclude(magasin=self.magasin)
+
+    # ------------------------
+    # 🔹 Traiter la demande automatiquement
+    # ------------------------
+    def traiter_demande(self, responsable_stock_id: uuid.UUID):
+        """
+        Vérifie la disponibilité dans d'autres magasins. 
+        Si disponible → crée un transfert.
+        Sinon → crée une demande d'achat.
+        Valide ensuite la demande.
+        """
+        stocks_disponibles = self.verifier_stock_autres_magasins()
+
+        if stocks_disponibles.exists():
+            # Stock trouvé dans un autre magasin → créer transfert
+            stock_source = stocks_disponibles.first()
+            TransfertStock.objects.create(
+                article=self.article,
+                magasin_source=stock_source.magasin,
+                magasin_dest=self.magasin,
+                quantite=self.quantite_demandee,
+                responsable_id=responsable_stock_id,
+                commentaire=f"Transfert créé suite à la demande {self.numero}"
+            )
+        else:
+            # Stock non disponible → créer demande d'achat
+            DemandeAchat.objects.create(
+                numero=f"DA-{uuid.uuid4().hex[:6].upper()}",
+                article=self.article,
+                quantite=self.quantite_demandee,
+                montant_estime=self.article.prix_unitaire_estime * self.quantite_demandee,
+                demandeur_id=self.demandeur_id,
+                justification=self.motif
+            )
+
+        # Valider la demande pour le responsable stock
+        self.valider(responsable_stock_id)
 
     def __str__(self):
         return f"{self.numero} - {self.article.nom} ({self.statut})"

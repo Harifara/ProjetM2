@@ -141,9 +141,7 @@ class DemandeReapprovisionnementViewSet(viewsets.ModelViewSet):
     queryset = DemandeReapprovisionnement.objects.select_related('magasin', 'article').all()
     serializer_class = DemandeReapprovisionnementSerializer
     permission_classes = [IsAuthenticated]
-
-    # ⚠️ Assurez-vous que filter_backends est une liste (vide si pas besoin)
-    filter_backends = []  # OU [filters.SearchFilter, filters.OrderingFilter] si vous utilisez
+    filter_backends = []
 
     def list(self, request, *args, **kwargs):
         logger.info("[GET] Début récupération demandes")
@@ -164,19 +162,76 @@ class DemandeReapprovisionnementViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def valider(self, request, pk=None):
+        """
+        Workflow complet :
+        1. Vérifier stock disponible dans d'autres magasins
+        2. Si disponible → créer TransfertStock
+        3. Sinon → créer DemandeAchat
+        4. Mettre à jour statut demande
+        """
         try:
             obj = self.get_object()
             responsable_id = getattr(request.user, "id", None)
-            obj.valider(responsable_stock_id=responsable_id)
+
+            if obj.statut != 'en_attente':
+                return Response({"error": "Cette demande a déjà été traitée."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # ----------------------------
+            # Vérifier si l'article est disponible ailleurs
+            # ----------------------------
+            autres_stocks = Stock.objects.filter(
+                article=obj.article,
+            ).exclude(magasin=obj.magasin).filter(quantite__gte=obj.quantite_demandee)
+
+            if autres_stocks.exists():
+                # Créer un transfert depuis le premier magasin trouvé
+                stock_source = autres_stocks.first()
+                transfert = TransfertStock.objects.create(
+                    article=obj.article,
+                    magasin_source=stock_source.magasin,
+                    magasin_dest=obj.magasin,
+                    quantite=obj.quantite_demandee,
+                    responsable_id=responsable_id,
+                    commentaire=f"Transfert automatique pour demande {obj.numero}"
+                )
+                logger.info(f"TransfertStock créé: {transfert}")
+                obj.quantite_approuvee = obj.quantite_demandee
+                obj.statut = 'approuve'
+                obj.validateur_id = responsable_id
+                obj.date_validation = timezone.now()
+                obj.save()
+
+            else:
+                # Créer une demande d'achat pour la finance
+                montant_estime = obj.article.prix_unitaire_estime * obj.quantite_demandee
+                demande_achat = DemandeAchat.objects.create(
+                    numero=f"DA-{uuid.uuid4().hex[:8].upper()}",
+                    article=obj.article,
+                    quantite=obj.quantite_demandee,
+                    montant_estime=montant_estime,
+                    statut='en_attente',
+                    demandeur_id=obj.demandeur_id,
+                    justification=f"Demande automatique pour {obj.numero}"
+                )
+                logger.info(f"DemandeAchat créée: {demande_achat}")
+                obj.statut = 'approuve'
+                obj.validateur_id = responsable_id
+                obj.date_validation = timezone.now()
+                obj.save()
+
             serializer = self.get_serializer(obj)
             logger.info(f"[POST] Demande {obj.numero} validée par {responsable_id}")
             return Response(serializer.data)
+
         except Exception as e:
-            logger.exception("[POST] Erreur validation")
+            logger.exception("[POST] Erreur validation workflow")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['post'])
     def rejeter(self, request, pk=None):
+        """
+        Rejeter la demande sans workflow automatique
+        """
         try:
             obj = self.get_object()
             responsable_id = getattr(request.user, "id", None)

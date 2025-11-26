@@ -179,6 +179,9 @@ class DemandeReapprovisionnementSerializer(serializers.ModelSerializer):
         write_only=True
     )
 
+    # Champ optionnel pour déclencher le traitement automatique
+    traiter = serializers.BooleanField(write_only=True, default=False)
+
     demandeur_id = serializers.UUIDField(read_only=True)
     validateur_id = serializers.UUIDField(read_only=True)
 
@@ -191,13 +194,28 @@ class DemandeReapprovisionnementSerializer(serializers.ModelSerializer):
             "motif", "statut", "priorite",
             "demandeur_id", "validateur_id",
             "date_validation", "commentaire_validation",
-            "created_at", "updated_at"
+            "created_at", "updated_at",
+            "traiter"
         ]
         read_only_fields = [
             "id", "numero", "quantite_approuvee",
             "statut", "date_validation",
-            "created_at", "updated_at"
+            "created_at", "updated_at",
+            "validateur_id"
         ]
+
+    def create(self, validated_data):
+        traiter = validated_data.pop("traiter", False)
+        # On assigne automatiquement le demandeur connecté
+        validated_data["demandeur_id"] = self.context["request"].user.id
+        demande = super().create(validated_data)
+
+        if traiter:
+            # Appel du workflow automatique côté responsable stock
+            responsable_stock_id = self.context["request"].user.id
+            demande.traiter_demande(responsable_stock_id)
+
+        return demande
 
 # =========================
 # TransfertStock
