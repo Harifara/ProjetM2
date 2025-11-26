@@ -9,6 +9,11 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework import viewsets, filters
 from rest_framework.permissions import IsAuthenticated
+import uuid
+import logging
+
+
+
 
 
 
@@ -130,36 +135,84 @@ class MouvementStockViewSet(viewsets.ModelViewSet):
             )
         return queryset
 
-# =========================
-# DemandeReapprovisionnement
-# =========================
+
+logger = logging.getLogger(__name__)
+
 class DemandeReapprovisionnementViewSet(viewsets.ModelViewSet):
     queryset = DemandeReapprovisionnement.objects.all()
     serializer_class = DemandeReapprovisionnementSerializer
     permission_classes = [IsAuthenticated]
 
+    def create(self, request, *args, **kwargs):
+        """
+        Création d'une demande avec logs pour debug
+        """
+        logger.info(f"[POST Demande] Payload reçu: {request.data}")
+        try:
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            logger.error("[POST Demande] ERREUR:", exc_info=True)
+            return Response({"error": str(e)}, status=500)
+
     def perform_create(self, serializer):
+        """
+        Génère le numéro et ajoute l'UUID du demandeur
+        """
         numero = f"DR-{uuid.uuid4().hex[:8].upper()}"
         demandeur_id = getattr(self.request.user, "id", None)
+
+        if not demandeur_id:
+            logger.error(f"[perform_create] request.user.id manquant")
+            raise serializers.ValidationError("Utilisateur non identifié")
+
+        logger.info(f"[perform_create] Création demande DR avec numéro={numero}, demandeur_id={demandeur_id}")
         serializer.save(numero=numero, demandeur_id=demandeur_id)
 
     @action(detail=True, methods=['post'], permission_classes=[IsResponsableStock])
     def valider(self, request, pk=None):
-        obj = self.get_object()
-        responsable_id = getattr(request.user, "id", None)
-        obj.valider(responsable_stock_id=responsable_id)
-        serializer = self.get_serializer(obj, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        """
+        Valide une demande
+        """
+        try:
+            obj = self.get_object()
+            responsable_id = getattr(request.user, "id", None)
+
+            if not responsable_id:
+                logger.error(f"[valider] request.user.id manquant")
+                return Response({"error": "Utilisateur non identifié"}, status=400)
+
+            logger.info(f"[valider] Validation de la demande {obj.numero} par {responsable_id}")
+            obj.valider(responsable_stock_id=responsable_id)
+            serializer = self.get_serializer(obj, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"[valider] ERREUR validation demande {pk}:", exc_info=True)
+            return Response({"error": str(e)}, status=500)
 
     @action(detail=True, methods=['post'], permission_classes=[IsResponsableStock])
     def rejeter(self, request, pk=None):
-        obj = self.get_object()
-        responsable_id = getattr(request.user, "id", None)
-        commentaire = request.data.get("commentaire", "")
-        obj.rejeter(responsable_stock_id=responsable_id, commentaire=commentaire)
-        serializer = self.get_serializer(obj, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        """
+        Rejette une demande
+        """
+        try:
+            obj = self.get_object()
+            responsable_id = getattr(request.user, "id", None)
 
+            if not responsable_id:
+                logger.error(f"[rejeter] request.user.id manquant")
+                return Response({"error": "Utilisateur non identifié"}, status=400)
+
+            commentaire = request.data.get("commentaire", "")
+            logger.info(f"[rejeter] Rejet de la demande {obj.numero} par {responsable_id}, commentaire={commentaire}")
+            obj.rejeter(responsable_stock_id=responsable_id, commentaire=commentaire)
+
+            serializer = self.get_serializer(obj, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"[rejeter] ERREUR rejet demande {pk}:", exc_info=True)
+            return Response({"error": str(e)}, status=500)
 
 # =========================
 # TransfertStock
