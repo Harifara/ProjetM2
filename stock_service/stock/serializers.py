@@ -255,5 +255,7 @@ class DemandeAchatSerializer(serializers.ModelSerializer):
         article_id = validated_data.pop('article_id')
         article = Article.objects.get(id=article_id)
         validated_data['article'] = article
-        validated_data['numero'] = f"DA-{uuid.uuid4().hex[:8].upper()}"
+        # Assurer que le numéro est unique si pas fourni
+        if 'numero' not in validated_data:
+            validated_data['numero'] = f"DA-{uuid.uuid4().hex[:8].upper()}"
         return super().create(validated_data)
