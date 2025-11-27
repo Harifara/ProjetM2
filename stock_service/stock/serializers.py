@@ -233,8 +233,10 @@ class TransfertStockSerializer(serializers.ModelSerializer):
 # DemandeAchat
 # =========================
 class DemandeAchatSerializer(serializers.ModelSerializer):
-    article = serializers.SerializerMethodField(read_only=True)
-    article_id = serializers.UUIDField(write_only=True)
+    article_id = data.pop('article_id')
+    article = Article.objects.get(id=article_id)
+    demande = DemandeAchat.objects.create(article=article, **data)
+
 
     class Meta:
         model = DemandeAchat
