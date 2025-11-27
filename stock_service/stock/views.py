@@ -271,7 +271,8 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
     """
     queryset = DemandeAchat.objects.all()
     serializer_class = DemandeAchatSerializer
-    permission_classes = [IsAuthenticated]  # exiger l'authentification
+    permission_classes = [IsAuthenticated, IsResponsableStockOrMagasinier]  # exiger l'authentification
+    filter_backends = []
 
     def list(self, request, *args, **kwargs):
         """GET /api/stock/demandes-achat/"""
