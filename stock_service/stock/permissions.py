@@ -55,27 +55,32 @@ class IsResponsableStockOrReadOnly(permissions.BasePermission):
         return has_role(request.user, ["responsable_stock"])
 
 
+
+    
 class CanAccessOwnMagasinOnly(permissions.BasePermission):
+  
+
     message = "Vous ne pouvez accéder qu'aux données de votre magasin."
 
     def has_object_permission(self, request, view, obj):
         user = request.user
         role = getattr(user, "role", None)
 
-        # ✅ L’admin et le responsable stock peuvent tout voir
+        # Admin et responsable stock peuvent tout voir
         if role in ["admin", "responsable_stock"]:
             return True
 
-        # 👤 Le magasinier ne peut voir que son propre magasin
-        if role == "magasinier":
-            magasinier_id = getattr(user, "id", None)
+        # Magasinier : ne peut accéder qu'aux objets liés à son magasin
+        if role == "magasinier" and hasattr(user, "magasin_id") and user.magasin_id:
+            # Vérifie si l'objet a un attribut 'magasin' ou 'magasin_id'
+            if hasattr(obj, "magasin") and getattr(obj.magasin, "id", None):
+                return str(obj.magasin.id) == str(user.magasin_id)
+            elif hasattr(obj, "magasin_id"):
+                return str(obj.magasin_id) == str(user.magasin_id)
 
-            if hasattr(obj, 'magasin'):
-                return str(obj.magasin.magasinier_id) == str(magasinier_id)
-            if hasattr(obj, 'magasinier_id'):
-                return str(obj.magasinier_id) == str(magasinier_id)
-
+        # Autres cas : accès refusé
         return False
+
 
 
 # ============================================================
@@ -90,3 +95,6 @@ class IsAdminOrResponsableStock(permissions.BasePermission):
 
     def has_permission(self, request, view):
         return has_role(request.user, ["responsable_stock"])
+
+
+

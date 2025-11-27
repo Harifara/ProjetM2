@@ -111,6 +111,17 @@ class StockViewSet(viewsets.ModelViewSet):
         if self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
             return [CanAccessOwnMagasinOnly()]
         return super().get_permissions()
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = super().get_queryset()
+
+        # ✅ Magasinier : ne voit que son magasin
+        if getattr(user, "role", None) == "magasinier" and user.magasin_id:
+            qs = qs.filter(magasin_id=user.magasin_id)
+        # Responsable stock et admin voient tout
+        return qs
+
     
     
 # =========================
