@@ -233,10 +233,8 @@ class TransfertStockSerializer(serializers.ModelSerializer):
 # DemandeAchat
 # =========================
 class DemandeAchatSerializer(serializers.ModelSerializer):
-    article_id = data.pop('article_id')
-    article = Article.objects.get(id=article_id)
-    demande = DemandeAchat.objects.create(article=article, **data)
-
+    article = ArticleSerializer(read_only=True)
+    article_id = serializers.UUIDField(write_only=True)
 
     class Meta:
         model = DemandeAchat
@@ -253,27 +251,9 @@ class DemandeAchatSerializer(serializers.ModelSerializer):
             'statut_reception', 'date_reception', 'created_at', 'updated_at'
         ]
 
-    def get_article(self, obj):
-        """Renvoie les informations de l'article lié"""
-        if obj.article:
-            return {
-                "id": str(obj.article.id),
-                "code": obj.article.code,
-                "nom": obj.article.nom,
-                "type_categorie": obj.article.type_categorie,
-                "description": obj.article.description,
-            }
-        return None
-
     def create(self, validated_data):
-        # Récupérer l'article à partir de l'UUID
         article_id = validated_data.pop('article_id')
-        try:
-            validated_data['article'] = Article.objects.get(id=article_id)
-        except Article.DoesNotExist:
-            raise serializers.ValidationError({"article_id": "Article non trouvé."})
-
-        # Créer la demande avec le reste des champs
+        article = Article.objects.get(id=article_id)
+        validated_data['article'] = article
+        validated_data['numero'] = f"DA-{uuid.uuid4().hex[:8].upper()}"
         return super().create(validated_data)
-
-
