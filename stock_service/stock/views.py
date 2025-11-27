@@ -268,22 +268,17 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
     permission_classes = [IsResponsableStockOrReadOnly]
 
     def create(self, request, *args, **kwargs):
-        # Vérifier que l’utilisateur est connecté
+        # Vérification utilisateur
         if not request.user or request.user.is_anonymous:
             return Response({"error": "Utilisateur non authentifié"}, status=401)
 
         data = request.data.copy()
-
-        # Ajouter automatiquement le demandeur
         data['demandeur_id'] = str(request.user.id)
-
-        # Générer un numéro unique
         data['numero'] = f"DA-{uuid.uuid4().hex[:8].upper()}"
 
         serializer = self.get_serializer(data=data)
-        serializer.is_valid(raise_exception=True)
+        serializer.is_valid(raise_exception=True)  # Renvoie 400 si invalide
         self.perform_create(serializer)
-
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     # -----------------------------

@@ -252,10 +252,19 @@ class DemandeAchatSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        article_id = validated_data.pop('article_id')
-        article = Article.objects.get(id=article_id)
+        article_id = validated_data.pop('article_id', None)
+        if not article_id:
+            raise serializers.ValidationError({"article_id": "Ce champ est requis."})
+
+        try:
+            article = Article.objects.get(id=article_id)
+        except (ObjectDoesNotExist, ValueError):
+            raise serializers.ValidationError({"article_id": "Article introuvable ou UUID invalide."})
+
         validated_data['article'] = article
-        # Assurer que le numéro est unique si pas fourni
+
+        # Numéro unique si pas fourni
         if 'numero' not in validated_data:
             validated_data['numero'] = f"DA-{uuid.uuid4().hex[:8].upper()}"
+
         return super().create(validated_data)
