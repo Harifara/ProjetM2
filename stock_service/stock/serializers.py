@@ -234,9 +234,22 @@ class TransfertStockSerializer(serializers.ModelSerializer):
 # =========================
 class DemandeAchatSerializer(serializers.ModelSerializer):
     article = ArticleSerializer(read_only=True)
+    article_id = serializers.UUIDField(write_only=True)
 
     class Meta:
         model = DemandeAchat
-        fields = "__all__"
+        fields = [
+            'id', 'numero', 'article', 'article_id', 'quantite', 'montant_estime',
+            'statut', 'demandeur_id', 'finance_valideur_id', 'justification',
+            'date_validation_finance', 'commentaire_finance',
+            'statut_reception', 'date_reception', 'magasin_reception_id',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'numero', 'statut', 'demandeur_id', 'finance_valideur_id',
+            'date_validation_finance', 'commentaire_finance',
+            'statut_reception', 'date_reception', 'created_at', 'updated_at'
+        ]
+
 
 

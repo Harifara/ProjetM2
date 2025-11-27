@@ -267,20 +267,50 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
     serializer_class = DemandeAchatSerializer
     permission_classes = [IsResponsableStockOrReadOnly]
 
+    def create(self, request, *args, **kwargs):
+        # Vérifier que l’utilisateur est connecté
+        if not request.user or request.user.is_anonymous:
+            return Response({"error": "Utilisateur non authentifié"}, status=401)
+
+        data = request.data.copy()
+
+        # Ajouter automatiquement le demandeur
+        data['demandeur_id'] = str(request.user.id)
+
+        # Générer un numéro unique
+        data['numero'] = f"DA-{uuid.uuid4().hex[:8].upper()}"
+
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    # -----------------------------
+    # VALIDATION FINANCE
+    # -----------------------------
     @action(detail=True, methods=['post'], permission_classes=[IsResponsableStock])
     def valider_finance(self, request, pk=None):
         obj = self.get_object()
         finance_id = getattr(request.user, "id", None)
+
         obj.valider_finance(finance_user_id=finance_id)
+        obj.save()
+
         serializer = self.get_serializer(obj)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    # -----------------------------
+    # REJET FINANCE
+    # -----------------------------
     @action(detail=True, methods=['post'], permission_classes=[IsResponsableStock])
     def rejeter_finance(self, request, pk=None):
         obj = self.get_object()
         finance_id = getattr(request.user, "id", None)
         commentaire = request.data.get("commentaire", "")
+
         obj.rejeter_finance(finance_user_id=finance_id, commentaire=commentaire)
+        obj.save()
+
         serializer = self.get_serializer(obj)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
