@@ -265,7 +265,8 @@ class TransfertStockViewSet(viewsets.ModelViewSet):
 class DemandeAchatViewSet(viewsets.ModelViewSet):
     queryset = DemandeAchat.objects.all()
     serializer_class = DemandeAchatSerializer
-    permission_classes = [IsResponsableStockOrReadOnly]
+    permission_classes = []
+
 
     def create(self, request, *args, **kwargs):
         # Vérification utilisateur
