@@ -108,19 +108,24 @@ class StockViewSet(viewsets.ModelViewSet):
     filterset_fields = ['article', 'magasin']
 
     def get_permissions(self):
+        # Actions sensibles : appliquer la restriction magasinier → son propre magasin
         if self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
             return [CanAccessOwnMagasinOnly()]
         return super().get_permissions()
 
     def get_queryset(self):
+        """
+        Magasinier : ne voit que le stock de son magasin
+        Responsable stock et admin : voient tout
+        """
         user = self.request.user
         qs = super().get_queryset()
 
-        # ✅ Magasinier : ne voit que son magasin
-        if getattr(user, "role", None) == "magasinier" and user.magasin_id:
+        if getattr(user, "role", None) == "magasinier" and getattr(user, "magasin_id", None):
             qs = qs.filter(magasin_id=user.magasin_id)
-        # Responsable stock et admin voient tout
+
         return qs
+
 
     
     
@@ -151,8 +156,22 @@ logger = logging.getLogger(__name__)
 class DemandeReapprovisionnementViewSet(viewsets.ModelViewSet):
     queryset = DemandeReapprovisionnement.objects.select_related('magasin', 'article').all()
     serializer_class = DemandeReapprovisionnementSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanAccessOwnMagasinOnly]
     filter_backends = []
+    
+    def get_queryset(self):
+        """
+        Filtre les demandes :
+        - Les magasiniers voient seulement les demandes de leur magasin
+        - Les responsables de stock et admins voient tout
+        """
+        user = self.request.user
+        qs = super().get_queryset()
+
+        if getattr(user, "role", None) == "magasinier" and getattr(user, "magasin_id", None):
+            qs = qs.filter(magasin_id=user.magasin_id)
+
+        return qs
 
     def list(self, request, *args, **kwargs):
         logger.info("[GET] Début récupération demandes")
