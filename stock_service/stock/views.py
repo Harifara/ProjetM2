@@ -293,31 +293,11 @@ class TransfertStockViewSet(viewsets.ModelViewSet):
 # DemandeAchat
 # =========================
 class DemandeAchatViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet pour gérer les demandes d'achat :
-    - Liste (GET)
-    - Création (POST)
-    - Validation et rejet par la finance
-    """
     queryset = DemandeAchat.objects.all()
     serializer_class = DemandeAchatSerializer
-    permission_classes = [IsAuthenticated]  # exiger l'authentification
-
-    def list(self, request, *args, **kwargs):
-        """GET /api/stock/demandes-achat/"""
-        try:
-            queryset = self.get_queryset()
-            serializer = self.get_serializer(queryset, many=True)
-            return Response(serializer.data)
-        except Exception as e:
-            traceback.print_exc()
-            return Response({"error": str(e)}, status=500)
+    permission_classes = [IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
-        """Créer une nouvelle demande d'achat"""
-        if not request.user or request.user.is_anonymous:
-            return Response({"error": "Utilisateur non authentifié"}, status=401)
-
         serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
@@ -325,7 +305,6 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[IsResponsableStock])
     def valider_finance(self, request, pk=None):
-        """Valider la demande côté finance"""
         try:
             obj = self.get_object()
             finance_id = getattr(request.user, "id", None)
@@ -340,14 +319,12 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[IsResponsableStock])
     def rejeter_finance(self, request, pk=None):
-        """Rejeter la demande côté finance avec commentaire"""
         try:
             obj = self.get_object()
             finance_id = getattr(request.user, "id", None)
             commentaire = request.data.get("commentaire", "")
             if not commentaire:
                 return Response({"error": "Le commentaire est obligatoire."}, status=400)
-
             obj.rejeter_finance(finance_user_id=finance_id, commentaire=commentaire)
             serializer = self.get_serializer(obj)
             return Response(serializer.data, status=status.HTTP_200_OK)

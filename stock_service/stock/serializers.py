@@ -270,4 +270,8 @@ class DemandeAchatSerializer(serializers.ModelSerializer):
         demandeur = self.context['request'].user
         validated_data['demandeur_id'] = demandeur.id
 
+        # Sécuriser types
+        validated_data['quantite'] = int(validated_data.get('quantite', 1))
+        validated_data['montant_estime'] = Decimal(validated_data.get('montant_estime', 0))
+
         return super().create(validated_data)
