@@ -293,40 +293,17 @@ class TransfertStockViewSet(viewsets.ModelViewSet):
 # DemandeAchat
 # =========================
 class DemandeAchatViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet pour gérer les demandes d'achat :
-    - Liste (GET)
-    - Création (POST)
-    - Validation et rejet par la finance
-    """
     queryset = DemandeAchat.objects.all()
     serializer_class = DemandeAchatSerializer
     permission_classes = [IsAuthenticated, IsResponsableStock]
 
     def get_queryset(self):
-        """
-        Précharge l'article pour éviter les requêtes supplémentaires.
-        """
         return super().get_queryset().select_related('article')
 
-    def list(self, request, *args, **kwargs):
-        """Récupérer toutes les demandes d'achat"""
-        try:
-            serializer = self.get_serializer(self.get_queryset(), many=True)
-            return Response(serializer.data)
-        except Exception as e:
-            traceback.print_exc()
-            return Response(
-                {"error": "Erreur lors de la récupération des demandes d'achat", "details": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
     def perform_create(self, serializer):
-        """Assignation automatique du demandeur"""
         serializer.save(demandeur=self.request.user)
 
     def create(self, request, *args, **kwargs):
-        """Créer une nouvelle demande d'achat"""
         try:
             serializer = self.get_serializer(data=request.data, context={'request': request})
             serializer.is_valid(raise_exception=True)
@@ -343,24 +320,19 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[IsResponsableStock])
     def valider_finance(self, request, pk=None):
-        """Valider la demande côté finance"""
         try:
             obj = self.get_object()
             obj.valider_finance(finance_user_id=request.user.id)
             serializer = self.get_serializer(obj)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.data)
         except ValidationError as ve:
             return Response({"error": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             traceback.print_exc()
-            return Response(
-                {"error": "Erreur lors de la validation par la finance", "details": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['post'], permission_classes=[IsResponsableStock])
     def rejeter_finance(self, request, pk=None):
-        """Rejeter la demande côté finance avec commentaire"""
         try:
             obj = self.get_object()
             commentaire = request.data.get("commentaire", "").strip()
@@ -368,12 +340,9 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
                 return Response({"error": "Le commentaire est obligatoire."}, status=status.HTTP_400_BAD_REQUEST)
             obj.rejeter_finance(finance_user_id=request.user.id, commentaire=commentaire)
             serializer = self.get_serializer(obj)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.data)
         except ValidationError as ve:
             return Response({"error": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             traceback.print_exc()
-            return Response(
-                {"error": "Erreur lors du rejet par la finance", "details": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

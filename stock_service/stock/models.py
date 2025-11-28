@@ -458,16 +458,16 @@ class DemandeAchat(models.Model):
 
     # Statut finance
     statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='en_attente')
-    demandeur_id = models.UUIDField(help_text="UUID du magasinier connecté")
-    finance_valideur_id = models.UUIDField(null=True, blank=True, help_text="UUID du responsable finance")
+    demandeur = models.ForeignKey('auth.User', on_delete=models.PROTECT, related_name='demandes_achat')  # Remplace demandeur_id
+    finance_valideur_id = models.UUIDField(null=True, blank=True)
     justification = models.TextField()
     date_validation_finance = models.DateTimeField(null=True, blank=True)
     commentaire_finance = models.TextField(blank=True)
 
-    # Suivi de la réception réelle du stock
+    # Suivi réception
     statut_reception = models.CharField(max_length=20, choices=RECEPTION_CHOICES, default='en_attente')
     date_reception = models.DateTimeField(null=True, blank=True)
-    magasin_reception_id = models.UUIDField(null=True, blank=True, help_text="Magasin qui reçoit l'achat")
+    magasin_reception_id = models.UUIDField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
