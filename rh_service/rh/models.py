@@ -534,8 +534,7 @@ class TypeAchat(models.Model):
         return self.nom
 
 
-# -------------------- Achat --------------------
-# -------------------- Achat --------------------
+
 class Achat(models.Model):
     STATUT_CHOICES = [
         ('non_demande', 'Non demandé'),
