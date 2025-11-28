@@ -293,18 +293,50 @@ class TransfertStockViewSet(viewsets.ModelViewSet):
 # DemandeAchat
 # =========================
 class DemandeAchatViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet pour gérer les demandes d'achat :
+    - Liste (GET)
+    - Création (POST)
+    - Validation et rejet par la finance
+    """
     queryset = DemandeAchat.objects.all()
     serializer_class = DemandeAchatSerializer
     permission_classes = [IsAuthenticated]
 
+    def list(self, request, *args, **kwargs):
+        """Récupérer toutes les demandes d'achat"""
+        try:
+            queryset = self.get_queryset().select_related('article')  # Précharge les articles
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            traceback.print_exc()
+            return Response(
+                {"error": "Erreur lors de la récupération des demandes d'achat", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        """Créer une nouvelle demande d'achat"""
+        try:
+            data = request.data.copy()
+            data['demandeur_id'] = str(request.user.id)  # Assignation automatique
+            serializer = self.get_serializer(data=data, context={'request': request})
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except ValidationError as ve:
+            return Response({"error": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            traceback.print_exc()
+            return Response(
+                {"error": "Erreur lors de la création de la demande d'achat", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=True, methods=['post'], permission_classes=[IsResponsableStock])
     def valider_finance(self, request, pk=None):
+        """Valider la demande côté finance"""
         try:
             obj = self.get_object()
             finance_id = getattr(request.user, "id", None)
@@ -315,16 +347,20 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
             return Response({"error": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             traceback.print_exc()
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": "Erreur lors de la validation par la finance", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=True, methods=['post'], permission_classes=[IsResponsableStock])
     def rejeter_finance(self, request, pk=None):
+        """Rejeter la demande côté finance avec commentaire"""
         try:
             obj = self.get_object()
             finance_id = getattr(request.user, "id", None)
             commentaire = request.data.get("commentaire", "")
             if not commentaire:
-                return Response({"error": "Le commentaire est obligatoire."}, status=400)
+                return Response({"error": "Le commentaire est obligatoire."}, status=status.HTTP_400_BAD_REQUEST)
             obj.rejeter_finance(finance_user_id=finance_id, commentaire=commentaire)
             serializer = self.get_serializer(obj)
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -332,4 +368,7 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
             return Response({"error": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             traceback.print_exc()
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": "Erreur lors du rejet par la finance", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
