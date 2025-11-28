@@ -303,10 +303,8 @@ class BulletinPaie(models.Model):
 # ============================================================
 class ValidationDemande(models.Model):
     TYPE_DEMANDE_CHOICES = [
-        ('contrat', 'Contrat'),
-        ('achat_stock', 'Achat Stock'),
-        ('location', 'Location'),
-        ('electricite', 'Électricité'),
+        ('rh', 'Demande RH'),
+        ('achat_stock', 'Demande Stock'),
     ]
     
     STATUT_CHOICES = [
@@ -317,29 +315,17 @@ class ValidationDemande(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     numero = models.CharField(max_length=100, unique=True, blank=True)
-    
     type_demande = models.CharField(max_length=50, choices=TYPE_DEMANDE_CHOICES)
     
     # ID de la demande dans le service d'origine
-    demande_origine_id = models.UUIDField(
-        help_text="UUID de la demande d'origine (RH ou Stock)"
-    )
-    service_origine = models.CharField(
-        max_length=50,
-        choices=[('rh_service', 'RH'), ('stock_service', 'Stock')]
-    )
+    demande_origine_id = models.UUIDField(help_text="UUID de la demande d'origine (RH ou Stock)")
+    service_origine = models.CharField(max_length=50, choices=[('rh_service', 'RH'), ('stock_service', 'Stock')])
     
     montant = models.DecimalField(max_digits=15, decimal_places=2)
     description = models.TextField()
     statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='en_attente')
     
-    # Responsable finance qui valide
-    validateur_finance_id = models.UUIDField(
-        null=True,
-        blank=True,
-        help_text="UUID du responsable finance (depuis auth_service)"
-    )
-    
+    validateur_finance_id = models.UUIDField(null=True, blank=True, help_text="UUID du responsable finance")
     date_reception = models.DateTimeField(auto_now_add=True)
     date_validation = models.DateTimeField(null=True, blank=True)
     commentaire_validation = models.TextField(blank=True)
@@ -359,7 +345,6 @@ class ValidationDemande(models.Model):
         super().save(*args, **kwargs)
 
     def approuver(self, responsable_finance_id: uuid.UUID, commentaire: str = ''):
-        """Approuve la demande RH/Stock."""
         if self.statut != 'en_attente':
             raise ValidationError("Cette demande a déjà été traitée.")
         
@@ -368,9 +353,11 @@ class ValidationDemande(models.Model):
         self.date_validation = timezone.now()
         self.commentaire_validation = commentaire
         self.save()
+        
+        # 🔹 Mettre à jour le service d'origine
+        self._update_service_origine('approuve')
 
     def rejeter(self, responsable_finance_id: uuid.UUID, commentaire: str = ''):
-        """Rejette la demande RH/Stock."""
         if self.statut != 'en_attente':
             raise ValidationError("Cette demande a déjà été traitée.")
         
@@ -379,6 +366,26 @@ class ValidationDemande(models.Model):
         self.date_validation = timezone.now()
         self.commentaire_validation = commentaire
         self.save()
+        
+        # 🔹 Mettre à jour le service d'origine
+        self._update_service_origine('rejete')
+
+    def _update_service_origine(self, statut_finance):
+        """Synchronise le statut dans le service d'origine"""
+        if self.service_origine == 'rh_service':
+            from rh_service.models import Demande
+            demande = Demande.objects.get(id=self.demande_origine_id)
+            # Ajuster le statut selon les règles RH
+            demande.status = 'approuve' if statut_finance == 'approuve' else 'refuse'
+            demande.save()
+        elif self.service_origine == 'stock_service':
+            from stock_service.models import DemandeAchat
+            demande = DemandeAchat.objects.get(id=self.demande_origine_id)
+            demande.statut = 'approuve' if statut_finance == 'approuve' else 'rejete'
+            demande.finance_valideur_id = self.validateur_finance_id
+            demande.date_validation_finance = timezone.now()
+            demande.commentaire_finance = self.commentaire_validation
+            demande.save()
 
     def __str__(self):
         return f"{self.numero} - {self.type_demande} ({self.statut})"
