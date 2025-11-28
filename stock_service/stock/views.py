@@ -302,7 +302,6 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
     queryset = DemandeAchat.objects.all()
     serializer_class = DemandeAchatSerializer
     permission_classes = [IsAuthenticated]  # exiger l'authentification
-    filter_backends = []
 
     def list(self, request, *args, **kwargs):
         """GET /api/stock/demandes-achat/"""
@@ -311,7 +310,6 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(queryset, many=True)
             return Response(serializer.data)
         except Exception as e:
-            import traceback
             traceback.print_exc()
             return Response({"error": str(e)}, status=500)
 
@@ -320,11 +318,7 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
         if not request.user or request.user.is_anonymous:
             return Response({"error": "Utilisateur non authentifié"}, status=401)
 
-        data = request.data.copy()
-        data['demandeur_id'] = str(request.user.id)
-        data['numero'] = f"DA-{uuid.uuid4().hex[:8].upper()}"
-
-        serializer = self.get_serializer(data=data)
+        serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -336,13 +330,11 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
             obj = self.get_object()
             finance_id = getattr(request.user, "id", None)
             obj.valider_finance(finance_user_id=finance_id)
-            obj.save()
             serializer = self.get_serializer(obj)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except ValidationError as ve:
             return Response({"error": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            import traceback
             traceback.print_exc()
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -357,12 +349,10 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
                 return Response({"error": "Le commentaire est obligatoire."}, status=400)
 
             obj.rejeter_finance(finance_user_id=finance_id, commentaire=commentaire)
-            obj.save()
             serializer = self.get_serializer(obj)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except ValidationError as ve:
             return Response({"error": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            import traceback
             traceback.print_exc()
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

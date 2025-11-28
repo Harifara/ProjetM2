@@ -263,8 +263,11 @@ class DemandeAchatSerializer(serializers.ModelSerializer):
 
         validated_data['article'] = article
 
-        # Numéro unique si pas fourni
-        if 'numero' not in validated_data:
-            validated_data['numero'] = f"DA-{uuid.uuid4().hex[:8].upper()}"
+        # Générer le numéro unique côté backend
+        validated_data['numero'] = f"DA-{uuid.uuid4().hex[:8].upper()}"
+
+        # Assigner le demandeur depuis le contexte
+        demandeur = self.context['request'].user
+        validated_data['demandeur_id'] = demandeur.id
 
         return super().create(validated_data)
