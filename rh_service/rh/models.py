@@ -628,44 +628,41 @@ class Payement(models.Model):
 
 # -------------------- Demande --------------------
 class Demande(models.Model):
-    STATUT_CHOICES = [
-        ("en_attente_finance", "En attente finance"),
-        ("partiellement_approuve", "Partiellement approuvé"),
-        ("approuve", "Approuvé"),
-        ("rejete", "Rejeté"),
+    STATUS_CHOICES = [
+        ('en_attente', 'En attente'),
+        ('en_cours', 'En cours'),
+        ('approuve', 'Approuvé'),
+        ('refuse', 'Refusé'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    numero = models.CharField(max_length=100, unique=True)
-    demandeur = models.ForeignKey(User, on_delete=models.CASCADE)
-
-    description = models.TextField(blank=True)
-    date_soumission = models.DateTimeField(default=timezone.now)
-
-    statut = models.CharField(max_length=50, choices=STATUT_CHOICES, default="en_attente_finance")
-    achats = models.ManyToManyField(Achat, blank=True)
-    paiements = models.ManyToManyField(Paiement, blank=True)
-
+    description = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente')
+    achats = models.ManyToManyField(Achat, related_name='demandes', blank=True)
+    payements = models.ManyToManyField(Payement, related_name='demandes', blank=True)
+    date_demande = models.DateTimeField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
-    def montant_total(self):
-        montant_achats = sum(a.montant for a in self.achats.all())
-        montant_paiements = sum(p.montant for p in self.paiements.all())
-        return montant_achats + montant_paiements
-
-    def update_status(self):
-        items = list(self.achats.all()) + list(self.paiements.all())
-
-        if all(i.statut == "rejete" for i in items):
-            self.statut = "rejete"
-        elif all(i.statut == "approuve" for i in items):
-            self.statut = "approuve"
-        elif any(i.statut == "approuve" for i in items):
-            self.statut = "partiellement_approuve"
-        else:
-            self.statut = "en_attente_finance"
-
-        self.save()
+    class Meta:
+        ordering = ['-date_demande']
 
     def __str__(self):
-        return f"Demande {self.numero}"
+        return f"Demande {self.id} - Total: {self.montant_total()}"
+
+    def montant_total(self):
+        total_achats = sum(a.montant_total() for a in self.achats.all())
+        total_payements = sum(p.montant for p in self.payements.all())
+        return total_achats + total_payements
+
+    def update_status(self):
+        if all(a.statut == 'valide' for a in self.achats.all()) and \
+           all(p.status == 'complete' for p in self.payements.all()):
+            self.status = 'approuve'
+        elif any(a.statut == 'refuse' for a in self.achats.all()) or \
+             any(p.status == 'echoue' for p in self.payements.all()):
+            self.status = 'refuse'
+        else:
+            self.status = 'en_cours'
+        self.save()
+

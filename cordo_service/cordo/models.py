@@ -1,5 +1,6 @@
 import uuid
 from django.db import models
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 # ============================================================
@@ -25,11 +26,11 @@ class ProfilCoordinateur(models.Model):
     
     # Permissions/Rôles du coordinateur
     peut_valider_decaissement = models.BooleanField(default=True)
-    
-    # Disponibilité du coordinateur
-    est_disponible = models.BooleanField(default=True)
+    peut_valider_demandes_rh = models.BooleanField(default=False)
+    peut_valider_demandes_stock = models.BooleanField(default=False)
     
     date_embauche = models.DateField()
+    date_derniere_connexion = models.DateTimeField(null=True, blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -43,7 +44,7 @@ class ProfilCoordinateur(models.Model):
         return f"{self.nom_complet} ({self.email})"
 
 # ============================================================
-# 📋 Gestion des Dossiers de Décaissement
+# 📋 Gestion des Demandes de Décaissement (depuis Finance)
 # ============================================================
 class DossierDecaissement(models.Model):
     PRIORITE_CHOICES = [
@@ -51,13 +52,6 @@ class DossierDecaissement(models.Model):
         ('normale', 'Normale'),
         ('haute', 'Haute'),
         ('urgente', 'Urgente'),
-    ]
-
-    STATUT_CHOICES = [
-        ('en_attente', 'En attente'),
-        ('partiellement_approuve', 'Partiellement approuvé'),
-        ('approuve', 'Approuvé'),
-        ('rejete', 'Rejeté'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -77,12 +71,23 @@ class DossierDecaissement(models.Model):
     
     priorite = models.CharField(max_length=20, choices=PRIORITE_CHOICES, default='normale')
     
-    statut = models.CharField(max_length=30, choices=STATUT_CHOICES, default='en_attente')
+    # Infos de la demande (cache local pour consultation rapide)
+    type_decaissement = models.CharField(max_length=100, help_text="Type du décaissement")
+    montant_demande = models.DecimalField(max_digits=15, decimal_places=2)
+    justification = models.TextField()
+    
+    # UUID du responsable finance qui a demandé
+    demandeur_finance_id = models.UUIDField(
+        help_text="UUID du responsable finance (depuis auth_service)"
+    )
     
     date_reception = models.DateTimeField(auto_now_add=True)
     date_limite_decision = models.DateTimeField(
         help_text="Date limite pour décider (généralement 3-5 jours)"
     )
+    
+    # Notes du coordinateur
+    notes_interne = models.TextField(blank=True, help_text="Notes internes du coordinateur")
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -103,10 +108,10 @@ class DossierDecaissement(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.numero} - {self.statut}"
+        return f"{self.numero} - {self.montant_demande} Ar"
 
 # ============================================================
-# ✅ Historique des Validations
+# ✅ Historique des Validations (Approbations/Rejets)
 # ============================================================
 class HistoriqueValidation(models.Model):
     ACTION_CHOICES = [
@@ -118,12 +123,14 @@ class HistoriqueValidation(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     
+    # Lien vers le dossier
     dossier_decaissement = models.ForeignKey(
         DossierDecaissement,
         on_delete=models.CASCADE,
         related_name='historique_validations'
     )
     
+    # Coordinateur qui a validé
     coordinateur = models.ForeignKey(
         ProfilCoordinateur,
         on_delete=models.PROTECT,
@@ -133,12 +140,27 @@ class HistoriqueValidation(models.Model):
     action = models.CharField(max_length=20, choices=ACTION_CHOICES)
     commentaire = models.TextField(blank=True)
     
-    # Liste des éléments approuvés (pour approbation partielle)
-    elements_approves = models.JSONField(default=list, help_text="Éléments approuvés par le coordinateur")
+    # Détails de la validation
+    montant_approuve = models.DecimalField(
+        max_digits=15, 
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Montant approuvé (peut être différent de la demande)"
+    )
     
-    raison_rejet = models.TextField(blank=True, help_text="Raison du rejet si applicable")
+    raison_rejet = models.TextField(
+        blank=True,
+        help_text="Raison du rejet si applicable"
+    )
     
     date_validation = models.DateTimeField(auto_now_add=True)
+    
+    # Documents joints
+    pieces_justificatives = models.JSONField(
+        default=list,
+        help_text="Liste des UUIDs de fichiers joints"
+    )
     
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -150,6 +172,106 @@ class HistoriqueValidation(models.Model):
 
     def __str__(self):
         return f"{self.dossier_decaissement.numero} - {self.action} - {self.date_validation.strftime('%d/%m/%Y')}"
+
+# ============================================================
+# 📊 Statistiques et Rapports
+# ============================================================
+class StatistiquesValidation(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    coordinateur = models.OneToOneField(
+        ProfilCoordinateur,
+        on_delete=models.CASCADE,
+        related_name='statistiques'
+    )
+    
+    # Statistiques mensuelles
+    mois = models.IntegerField(help_text="Mois (1-12)")
+    annee = models.IntegerField(help_text="Année")
+    
+    # Compteurs
+    total_demandes_traitees = models.IntegerField(default=0)
+    demandes_approuvees = models.IntegerField(default=0)
+    demandes_rejetees = models.IntegerField(default=0)
+    demandes_renvoyees = models.IntegerField(default=0)
+    
+    # Montants
+    montant_total_demande = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    montant_total_approuve = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    montant_total_rejete = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    
+    # Temps moyen de traitement (en heures)
+    temps_moyen_traitement = models.FloatField(default=0)
+    
+    # Taux d'approbation (pourcentage)
+    taux_approbation = models.FloatField(default=0)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'statistiques_validations'
+        verbose_name = 'Statistiques de Validation'
+        verbose_name_plural = 'Statistiques de Validations'
+        unique_together = [['coordinateur', 'mois', 'annee']]
+        ordering = ['-annee', '-mois']
+
+    def __str__(self):
+        return f"{self.coordinateur.nom_complet} - {self.mois}/{self.annee}"
+
+# ============================================================
+# 📝 Modèles de Décision (Templates)
+# ============================================================
+class ModeleDecision(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    nom = models.CharField(max_length=255, unique=True)
+    description = models.TextField()
+    
+    # Conditions pour appliquer le modèle
+    montant_min = models.DecimalField(
+        max_digits=15, 
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+    montant_max = models.DecimalField(
+        max_digits=15, 
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+    
+    type_decaissement = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Type de décaissement concerné (vide = tous)"
+    )
+    
+    # Decision par défaut
+    decision_defaut = models.CharField(
+        max_length=20,
+        choices=[('approuve', 'Approuvé'), ('rejete', 'Rejeté')],
+        help_text="Décision suggérée"
+    )
+    
+    commentaire_template = models.TextField(
+        blank=True,
+        help_text="Template de commentaire"
+    )
+    
+    est_actif = models.BooleanField(default=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'modeles_decisions'
+        verbose_name = 'Modèle de Décision'
+        verbose_name_plural = 'Modèles de Décisions'
+
+    def __str__(self):
+        return self.nom
 
 # ============================================================
 # 🔔 Notifications et Alertes
@@ -181,7 +303,6 @@ class AlerteDecaissement(models.Model):
     
     message = models.TextField()
     est_lue = models.BooleanField(default=False)
-    notifie_finance = models.BooleanField(default=False)
     
     created_at = models.DateTimeField(auto_now_add=True)
     lue_le = models.DateTimeField(null=True, blank=True)
@@ -193,6 +314,7 @@ class AlerteDecaissement(models.Model):
         ordering = ['-created_at']
 
     def marquer_comme_lue(self):
+        """Marque l'alerte comme lue."""
         self.est_lue = True
         self.lue_le = timezone.now()
         self.save()
@@ -201,79 +323,7 @@ class AlerteDecaissement(models.Model):
         return f"{self.type_alerte} - {self.dossier_decaissement.numero}"
 
 # ============================================================
-# 📊 Statistiques et Rapports
-# ============================================================
-class StatistiquesValidation(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    
-    coordinateur = models.OneToOneField(
-        ProfilCoordinateur,
-        on_delete=models.CASCADE,
-        related_name='statistiques'
-    )
-    
-    mois = models.IntegerField(help_text="Mois (1-12)")
-    annee = models.IntegerField(help_text="Année")
-    
-    total_demandes_traitees = models.IntegerField(default=0)
-    demandes_approuvees = models.IntegerField(default=0)
-    demandes_rejetees = models.IntegerField(default=0)
-    demandes_renvoyees = models.IntegerField(default=0)
-    
-    montant_total_demande = models.DecimalField(max_digits=15, decimal_places=2, default=0)
-    montant_total_approuve = models.DecimalField(max_digits=15, decimal_places=2, default=0)
-    
-    temps_moyen_traitement = models.FloatField(default=0)
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'statistiques_validations'
-        verbose_name = 'Statistiques de Validation'
-        verbose_name_plural = 'Statistiques de Validations'
-        unique_together = [['coordinateur', 'mois', 'annee']]
-        ordering = ['-annee', '-mois']
-
-    def __str__(self):
-        return f"{self.coordinateur.nom_complet} - {self.mois}/{self.annee}"
-
-# ============================================================
-# 📝 Modèles de Décision (Templates)
-# ============================================================
-class ModeleDecision(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    
-    nom = models.CharField(max_length=255, unique=True)
-    description = models.TextField()
-    
-    montant_min = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
-    montant_max = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
-    
-    type_decaissement = models.CharField(max_length=100, blank=True)
-    
-    decision_defaut = models.CharField(
-        max_length=20,
-        choices=[('approuve', 'Approuvé'), ('rejete', 'Rejeté')],
-        help_text="Décision suggérée"
-    )
-    
-    commentaire_template = models.TextField(blank=True)
-    est_actif = models.BooleanField(default=True)
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'modeles_decisions'
-        verbose_name = 'Modèle de Décision'
-        verbose_name_plural = 'Modèles de Décisions'
-
-    def __str__(self):
-        return self.nom
-
-# ============================================================
-# 📋 Vue pour Tableau de Bord
+# 📋 Tableau de Bord (Dashboard Data)
 # ============================================================
 class Vue_DemandesPendantes(models.Model):
     """Vue pour les demandes en attente (utiliser pour les dashboards)."""
