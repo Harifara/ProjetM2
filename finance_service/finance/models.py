@@ -19,7 +19,7 @@ class Depense(models.Model):
     numero = models.CharField(max_length=100, unique=True, blank=True)
     
     # Lien vers la demande de décaissement approuvée
-    demande_decaissement = models.ForeignKey(
+    'DemandeDecaissement', = models.ForeignKey(
         'DemandeDecaissement',  # mettre le nom du modèle entre quotes
         on_delete=models.PROTECT,
         related_name='depenses'
@@ -27,7 +27,7 @@ class Depense(models.Model):
 
     
     type_depense = models.ForeignKey(
-        TypeDecaissement,
+        'TypeDecaissement',
         on_delete=models.PROTECT,
         related_name='depenses'
     )
