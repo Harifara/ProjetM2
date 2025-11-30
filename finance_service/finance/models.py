@@ -20,10 +20,11 @@ class Depense(models.Model):
     
     # Lien vers la demande de décaissement approuvée
     demande_decaissement = models.ForeignKey(
-        DemandeDecaissement,
+        'DemandeDecaissement',  # mettre le nom du modèle entre quotes
         on_delete=models.PROTECT,
         related_name='depenses'
     )
+
     
     type_depense = models.ForeignKey(
         TypeDecaissement,
