@@ -444,7 +444,6 @@ class DemandeAchat(models.Model):
         ('approuve', 'Approuvé'),
         ('rejete', 'Rejeté'),
     ]
-
     RECEPTION_CHOICES = [
         ('en_attente', 'En attente'),
         ('recu', 'Reçu'),
@@ -455,22 +454,15 @@ class DemandeAchat(models.Model):
     article = models.ForeignKey(Article, on_delete=models.PROTECT, related_name='demandes_achat')
     quantite = models.IntegerField()
     montant_estime = models.DecimalField(max_digits=15, decimal_places=2)
-
-    # Statut finance
     statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='en_attente')
-    demandeur_id = models.UUIDField(help_text="UUID du magasinier connecté")
+    demandeur_id = models.UUIDField(help_text="UUID du magasinier")
     finance_valideur_id = models.UUIDField(null=True, blank=True, help_text="UUID du responsable finance")
     justification = models.TextField()
     date_validation_finance = models.DateTimeField(null=True, blank=True)
     commentaire_finance = models.TextField(blank=True)
-
-    # Suivi de la réception réelle du stock
-    statut_reception = models.CharField(
-        max_length=20, choices=RECEPTION_CHOICES, default='en_attente'
-    )
+    statut_reception = models.CharField(max_length=20, choices=RECEPTION_CHOICES, default='en_attente')
     date_reception = models.DateTimeField(null=True, blank=True)
-    magasin_reception_id = models.UUIDField(null=True, blank=True, help_text="Magasin qui reçoit l'achat")
-
+    magasin_reception_id = models.UUIDField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -480,43 +472,30 @@ class DemandeAchat(models.Model):
         verbose_name_plural = "Demandes d'achat"
         ordering = ['-created_at']
 
-    # ------------------------
-    # Méthodes Finance
-    # ------------------------
     def valider_finance(self, finance_user_id: uuid.UUID):
-        """Valide la demande côté finance."""
         if self.statut != 'en_attente':
-            raise ValidationError("Cette demande a déjà été traitée par la finance.")
+            raise ValidationError("Demande déjà traitée par la finance.")
         self.statut = 'approuve'
         self.finance_valideur_id = finance_user_id
         self.date_validation_finance = timezone.now()
         self.save()
 
     def rejeter_finance(self, finance_user_id: uuid.UUID, commentaire: str = ''):
-        """Rejette la demande côté finance."""
         if self.statut != 'en_attente':
-            raise ValidationError("Cette demande a déjà été traitée par la finance.")
+            raise ValidationError("Demande déjà traitée par la finance.")
         self.statut = 'rejete'
         self.finance_valideur_id = finance_user_id
         self.commentaire_finance = commentaire
         self.date_validation_finance = timezone.now()
         self.save()
 
-    # ------------------------
-    # Méthodes Magasinier
-    # ------------------------
     def enregistrer_reception(self, magasin_id: uuid.UUID):
-        """Enregistre la réception réelle des articles par le magasin."""
         if self.statut != 'approuve':
             raise ValidationError("La demande doit être approuvée par la finance avant réception.")
         if self.statut_reception == 'recu':
             raise ValidationError("Le stock a déjà été réceptionné.")
-        # Ajouter la quantité dans le stock du magasin
         stock, _ = Stock.objects.get_or_create(article=self.article, magasin_id=magasin_id)
-        stock.quantite += self.quantite
-        stock.save()
-
-        # Mettre à jour la demande
+        stock.ajouter_quantite(self.quantite)
         self.statut_reception = 'recu'
         self.date_reception = timezone.now()
         self.magasin_reception_id = magasin_id
@@ -524,5 +503,3 @@ class DemandeAchat(models.Model):
 
     def __str__(self):
         return f"{self.numero} - {self.article.nom} | Statut finance: {self.statut}, Réception: {self.statut_reception}"
-
-
