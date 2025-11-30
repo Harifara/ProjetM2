@@ -142,9 +142,17 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
     serializer_class = DemandeDecaissementSerializer
     permission_classes = [IsAuthenticated]
 
-    @action(detail=True, methods=['post'])
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return DemandeDecaissementCreateSerializer
+        return DemandeDecaissementSerializer
+
+    # ============================================================
+    # Endpoint personnalisé pour approuver un décaissement
+    # ============================================================
+    @action(detail=True, methods=['post'], url_path='approuver')
     def approuver(self, request, pk=None):
-        instance = self.get_object()
+        decaissement = self.get_object()
         coordinateur_id = request.data.get('coordinateur_id')
         commentaire = request.data.get('commentaire', '')
 
@@ -152,15 +160,18 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
             return Response({'error': 'coordinateur_id requis'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            instance.approuver(coordinateur_id=UUID(coordinateur_id), commentaire=commentaire)
-            serializer = self.get_serializer(instance)
-            return Response(serializer.data)
+            decaissement.approuver(coordinateur_id=UUID(coordinateur_id), commentaire=commentaire)
+            serializer = DemandeDecaissementSerializer(decaissement)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['post'])
+    # ============================================================
+    # Endpoint personnalisé pour rejeter un décaissement
+    # ============================================================
+    @action(detail=True, methods=['post'], url_path='rejeter')
     def rejeter(self, request, pk=None):
-        instance = self.get_object()
+        decaissement = self.get_object()
         coordinateur_id = request.data.get('coordinateur_id')
         commentaire = request.data.get('commentaire', '')
 
@@ -168,8 +179,17 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
             return Response({'error': 'coordinateur_id requis'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            instance.rejeter(coordinateur_id=UUID(coordinateur_id), commentaire=commentaire)
-            serializer = self.get_serializer(instance)
-            return Response(serializer.data)
+            decaissement.rejeter(coordinateur_id=UUID(coordinateur_id), commentaire=commentaire)
+            serializer = DemandeDecaissementSerializer(decaissement)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    # ============================================================
+    # Endpoint pour lister toutes les ValidationDemande en attente
+    # ============================================================
+    @action(detail=False, methods=['get'], url_path='validations-en-attente')
+    def validations_en_attente(self, request):
+        validations = ValidationDemande.objects.filter(statut='approuve').order_by('date_validation')
+        serializer = ValidationDemandeSerializer(validations, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

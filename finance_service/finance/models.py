@@ -316,19 +316,31 @@ class DemandeDecaissement(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     numero = models.CharField(max_length=100, unique=True, blank=True)
-    type_decaissement = models.ForeignKey(TypeDecaissement, on_delete=models.PROTECT, related_name='demandes_decaissement')
+    type_decaissement = models.ForeignKey(
+        TypeDecaissement,
+        on_delete=models.PROTECT,
+        related_name='demandes_decaissement'
+    )
     demandeur_finance_id = models.UUIDField(help_text="UUID du responsable finance")
-    validateur_coordinateur_id = models.UUIDField(null=True, blank=True, help_text="UUID du coordinateur")
+    validateur_coordinateur_id = models.UUIDField(
+        null=True, blank=True, help_text="UUID du coordinateur"
+    )
     montant_demande = models.DecimalField(max_digits=15, decimal_places=2)
     justification = models.TextField()
     statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='en_attente')
     date_demande = models.DateTimeField(auto_now_add=True)
     date_validation = models.DateTimeField(null=True, blank=True)
     commentaire_validation = models.TextField(blank=True)
-    demande_rh_id = models.UUIDField(null=True, blank=True)
-    demande_stock_id = models.UUIDField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # -------------------
+    # Relation vers plusieurs ValidationDemande
+    validations = models.ManyToManyField(
+        'ValidationDemande',
+        related_name='demandes_decaissement',
+        blank=True
+    )
 
     class Meta:
         db_table = 'demandes_decaissement'
@@ -339,6 +351,9 @@ class DemandeDecaissement(models.Model):
             self.numero = f"DEC-{uuid.uuid4().hex[:8].upper()}"
         super().save(*args, **kwargs)
 
+    # --------------------------------------------------------
+    # Méthodes d'approbation et rejet par le coordinateur
+    # --------------------------------------------------------
     def approuver(self, coordinateur_id: uuid.UUID, commentaire: str = ''):
         if self.statut != 'en_attente':
             raise ValidationError("Cette demande a déjà été traitée.")
@@ -358,14 +373,60 @@ class DemandeDecaissement(models.Model):
         self.commentaire_validation = commentaire
         self.save()
 
+    # --------------------------------------------------------
+    # Création de dépense(s) après approbation coordinateur
+    # --------------------------------------------------------
     def _creer_depense(self, responsable_finance_id: uuid.UUID):
-        from .models_decaissement import Depense
-        return Depense.objects.create(
-            demande_decaissement=self,
-            type_depense=self.type_decaissement,
-            montant=self.montant_demande,
-            description=self.justification,
-            responsable_finance_id=responsable_finance_id,
-            demande_rh_id=self.demande_rh_id,
-            demande_stock_id=self.demande_stock_id,
+        for v in self.validations.all():
+            Depense.objects.create(
+                demande_decaissement=self,
+                type_depense=self.type_decaissement,
+                montant=v.montant,
+                description=v.description,
+                responsable_finance_id=responsable_finance_id,
+                demande_rh_id=v.demande_origine_id if v.type_demande == 'rh' else None,
+                demande_stock_id=v.demande_origine_id if v.type_demande == 'achat_stock' else None,
+            )
+
+# ============================================================
+# Fonction pour créer un décaissement depuis plusieurs ValidationDemande
+# ============================================================
+def creer_demande_decaissement_finance(responsable_finance_id: uuid.UUID, validations: list, justification: str):
+    if not validations:
+        raise ValidationError("Aucune demande sélectionnée pour le décaissement.")
+
+    montant_total = sum(v.montant for v in validations)
+
+    # Déterminer le type principal
+    types = set(v.type_demande for v in validations)
+    if types == {'rh'}:
+        type_nom, type_dec = 'Salaire', 'salaire'
+    elif types == {'achat_stock'}:
+        type_nom, type_dec = 'Achat', 'achat'
+    else:
+        type_nom, type_dec = 'Autre', 'autre'
+
+    type_dec_obj, _ = TypeDecaissement.objects.get_or_create(
+        nom=type_nom,
+        defaults={'type_decaissement': type_dec}
+    )
+
+    with transaction.atomic():
+        decaissement = DemandeDecaissement.objects.create(
+            type_decaissement=type_dec_obj,
+            demandeur_finance_id=responsable_finance_id,
+            montant_demande=montant_total,
+            justification=justification,
+            statut='en_attente'
         )
+        decaissement.validations.set(validations)
+
+        # Marquer toutes les validations comme approuvées / en décaissement
+        for v in validations:
+            v.statut = 'approuve'
+            v.validateur_finance_id = responsable_finance_id
+            v.date_validation = timezone.now()
+            v.commentaire_validation = "Envoyé en décaissement"
+            v.save()
+
+    return decaissement
