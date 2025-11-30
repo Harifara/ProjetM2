@@ -292,6 +292,19 @@ class TransfertStockViewSet(viewsets.ModelViewSet):
 # =========================
 # DemandeAchat
 # =========================
+from rest_framework import viewsets, status, filters
+from rest_framework.response import Response
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from django.core.exceptions import ValidationError
+from django_filters.rest_framework import DjangoFilterBackend
+import traceback
+
+from .models import DemandeAchat
+from .serializers import DemandeAchatSerializer
+from .permissions import IsResponsableStock
+
+
 class DemandeAchatViewSet(viewsets.ModelViewSet):
     """
     ViewSet pour gérer les demandes d'achat :
@@ -299,47 +312,18 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
     - Création (POST)
     - Validation et rejet par la finance
     """
-    queryset = DemandeAchat.objects.all()
+    queryset = DemandeAchat.objects.all().select_related('article')
     serializer_class = DemandeAchatSerializer
     permission_classes = [IsAuthenticated, IsResponsableStock]
-
-    def get_queryset(self):
-        """
-        Précharge l'article pour éviter les requêtes supplémentaires.
-        """
-        return super().get_queryset().select_related('article')
-
-    def list(self, request, *args, **kwargs):
-        """Récupérer toutes les demandes d'achat"""
-        try:
-            serializer = self.get_serializer(self.get_queryset(), many=True)
-            return Response(serializer.data)
-        except Exception as e:
-            traceback.print_exc()
-            return Response(
-                {"error": "Erreur lors de la récupération des demandes d'achat", "details": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['statut', 'statut_reception', 'demandeur_id']
+    search_fields = ['numero', 'justification', 'article__nom']
+    ordering_fields = ['created_at', 'montant_estime']
+    ordering = ['-created_at']
 
     def perform_create(self, serializer):
-        """Assignation automatique du demandeur"""
-        serializer.save(demandeur=self.request.user)
-
-    def create(self, request, *args, **kwargs):
-        """Créer une nouvelle demande d'achat"""
-        try:
-            serializer = self.get_serializer(data=request.data, context={'request': request})
-            serializer.is_valid(raise_exception=True)
-            self.perform_create(serializer)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        except ValidationError as ve:
-            return Response({"error": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            traceback.print_exc()
-            return Response(
-                {"error": "Erreur lors de la création de la demande d'achat", "details": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        """Assignation automatique du demandeur et génération du numéro"""
+        serializer.save(demandeur_id=self.request.user.id)
 
     @action(detail=True, methods=['post'], permission_classes=[IsResponsableStock])
     def valider_finance(self, request, pk=None):
@@ -360,7 +344,7 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[IsResponsableStock])
     def rejeter_finance(self, request, pk=None):
-        """Rejeter la demande côté finance avec commentaire"""
+        """Rejeter la demande côté finance avec commentaire obligatoire"""
         try:
             obj = self.get_object()
             commentaire = request.data.get("commentaire", "").strip()

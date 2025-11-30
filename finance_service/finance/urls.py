@@ -8,7 +8,7 @@ from .views import (
     ValidationDemandeViewSet
 )
 
-# Création du router
+# Création du router DRF
 router = DefaultRouter()
 router.register(r'types-decaissement', TypeDecaissementViewSet, basename='type-decaissement')
 router.register(r'demandes-decaissement', DemandeDecaissementViewSet, basename='demande-decaissement')
@@ -16,7 +16,7 @@ router.register(r'depenses', DepenseViewSet, basename='depense')
 router.register(r'bulletins-paie', BulletinPaieViewSet, basename='bulletin-paie')
 router.register(r'validations-demandes', ValidationDemandeViewSet, basename='validation-demande')
 
-# Inclusion des routes dans l'URLconf
+# URLs finales
 urlpatterns = [
     path('', include(router.urls)),
 ]

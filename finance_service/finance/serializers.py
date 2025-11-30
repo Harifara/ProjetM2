@@ -21,57 +21,57 @@ class TypeDecaissementSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
-# =========================
-# Serializer DemandeDecaissement
-# =========================
-class DemandeDecaissementSerializer(serializers.ModelSerializer):
-    type_decaissement = TypeDecaissementSerializer(read_only=True)
-    type_decaissement_id = serializers.PrimaryKeyRelatedField(
-        queryset=TypeDecaissement.objects.all(),
-        source='type_decaissement',
-        write_only=True
-    )
+# # =========================
+# # Serializer DemandeDecaissement
+# # =========================
+# class DemandeDecaissementSerializer(serializers.ModelSerializer):
+#     type_decaissement = TypeDecaissementSerializer(read_only=True)
+#     type_decaissement_id = serializers.PrimaryKeyRelatedField(
+#         queryset=TypeDecaissement.objects.all(),
+#         source='type_decaissement',
+#         write_only=True
+#     )
 
-    class Meta:
-        model = DemandeDecaissement
-        fields = [
-            'id', 'numero', 'type_decaissement', 'type_decaissement_id',
-            'demandeur_finance_id', 'validateur_coordinateur_id',
-            'montant_demande', 'justification', 'statut',
-            'date_demande', 'date_validation', 'commentaire_validation',
-            'demande_rh_id', 'demande_stock_id',
-            'created_at', 'updated_at'
-        ]
-        read_only_fields = ['id', 'numero', 'date_demande', 'date_validation', 'created_at', 'updated_at']
+#     class Meta:
+#         model = DemandeDecaissement
+#         fields = [
+#             'id', 'numero', 'type_decaissement', 'type_decaissement_id',
+#             'demandeur_finance_id', 'validateur_coordinateur_id',
+#             'montant_demande', 'justification', 'statut',
+#             'date_demande', 'date_validation', 'commentaire_validation',
+#             'demande_rh_id', 'demande_stock_id',
+#             'created_at', 'updated_at'
+#         ]
+#         read_only_fields = ['id', 'numero', 'date_demande', 'date_validation', 'created_at', 'updated_at']
 
 
-# =========================
-# Serializer Depense
-# =========================
-class DepenseSerializer(serializers.ModelSerializer):
-    type_depense = TypeDecaissementSerializer(read_only=True)
-    type_depense_id = serializers.PrimaryKeyRelatedField(
-        queryset=TypeDecaissement.objects.all(),
-        source='type_depense',
-        write_only=True
-    )
-    demande_decaissement = DemandeDecaissementSerializer(read_only=True)
-    demande_decaissement_id = serializers.PrimaryKeyRelatedField(
-        queryset=DemandeDecaissement.objects.all(),
-        source='demande_decaissement',
-        write_only=True
-    )
+# # =========================
+# # Serializer Depense
+# # =========================
+# class DepenseSerializer(serializers.ModelSerializer):
+#     type_depense = TypeDecaissementSerializer(read_only=True)
+#     type_depense_id = serializers.PrimaryKeyRelatedField(
+#         queryset=TypeDecaissement.objects.all(),
+#         source='type_depense',
+#         write_only=True
+#     )
+#     demande_decaissement = DemandeDecaissementSerializer(read_only=True)
+#     demande_decaissement_id = serializers.PrimaryKeyRelatedField(
+#         queryset=DemandeDecaissement.objects.all(),
+#         source='demande_decaissement',
+#         write_only=True
+#     )
 
-    class Meta:
-        model = Depense
-        fields = [
-            'id', 'numero', 'demande_decaissement', 'demande_decaissement_id',
-            'type_depense', 'type_depense_id', 'montant', 'description', 'statut',
-            'employer_id', 'demande_rh_id', 'demande_stock_id',
-            'date_creation', 'date_paiement', 'responsable_finance_id',
-            'created_at', 'updated_at'
-        ]
-        read_only_fields = ['id', 'numero', 'date_creation', 'date_paiement', 'created_at', 'updated_at']
+#     class Meta:
+#         model = Depense
+#         fields = [
+#             'id', 'numero', 'demande_decaissement', 'demande_decaissement_id',
+#             'type_depense', 'type_depense_id', 'montant', 'description', 'statut',
+#             'employer_id', 'demande_rh_id', 'demande_stock_id',
+#             'date_creation', 'date_paiement', 'responsable_finance_id',
+#             'created_at', 'updated_at'
+#         ]
+#         read_only_fields = ['id', 'numero', 'date_creation', 'date_paiement', 'created_at', 'updated_at']
 
 
 # =========================
@@ -96,16 +96,58 @@ class BulletinPaieSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'numero', 'salaire_net', 'date_generation', 'date_validation', 'created_at', 'updated_at']
 
 
-# =========================
-# Serializer ValidationDemande
-# =========================
+# # =========================
+# # Serializer ValidationDemande
+# # =========================
+# class ValidationDemandeSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = ValidationDemande
+#         fields = [
+#             'id', 'numero', 'type_demande', 'demande_origine_id', 'service_origine',
+#             'montant', 'description', 'statut', 'validateur_finance_id',
+#             'date_reception', 'date_validation', 'commentaire_validation',
+#             'created_at', 'updated_at'
+#         ]
+#         read_only_fields = ['id', 'numero', 'date_reception', 'date_validation', 'created_at', 'updated_at']
+        
+        
+        
+        
+
+
+
+
+
+
+
+
+
+class DepenseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Depense
+        fields = '__all__'
+        read_only_fields = ['id', 'created_at']
+
+# ============================================================
+# ✅ ValidationDemande Serializer
+# ============================================================
 class ValidationDemandeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ValidationDemande
-        fields = [
-            'id', 'numero', 'type_demande', 'demande_origine_id', 'service_origine',
-            'montant', 'description', 'statut', 'validateur_finance_id',
-            'date_reception', 'date_validation', 'commentaire_validation',
-            'created_at', 'updated_at'
-        ]
-        read_only_fields = ['id', 'numero', 'date_reception', 'date_validation', 'created_at', 'updated_at']
+        fields = '__all__'
+        read_only_fields = ['decaissement', 'date_validation']
+
+# ============================================================
+# 👤 DemandeDecaissement Serializer
+# ============================================================
+class DemandeDecaissementSerializer(serializers.ModelSerializer):
+    # Inclure les dépenses associées
+    depenses = DepenseSerializer(many=True, read_only=True)
+    
+    # Inclure la validation associée (si existante)
+    validation = ValidationDemandeSerializer(read_only=True)
+
+    class Meta:
+        model = DemandeDecaissement
+        fields = '__all__'
+        read_only_fields = ['id', 'numero', 'created_at']

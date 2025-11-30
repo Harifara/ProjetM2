@@ -31,63 +31,63 @@ class TypeDecaissementViewSet(viewsets.ModelViewSet):
 # =======================================
 # ViewSet DemandeDecaissement
 # =======================================
-class DemandeDecaissementViewSet(viewsets.ModelViewSet):
-    queryset = DemandeDecaissement.objects.all().order_by('-date_demande')
-    serializer_class = DemandeDecaissementSerializer
-    permission_classes = [IsAuthenticated]
+# class DemandeDecaissementViewSet(viewsets.ModelViewSet):
+#     queryset = DemandeDecaissement.objects.all().order_by('-date_demande')
+#     serializer_class = DemandeDecaissementSerializer
+#     permission_classes = [IsAuthenticated]
 
-    @action(detail=True, methods=['post'])
-    def approuver(self, request, pk=None):
-        demande = self.get_object()
-        coordinateur_id = request.data.get('coordinateur_id')
-        commentaire = request.data.get('commentaire', '')
-        try:
-            demande.approuver(coordinateur_id=coordinateur_id, commentaire=commentaire)
-            serializer = self.get_serializer(demande)
-            return Response(serializer.data)
-        except Exception as e:
-            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+#     @action(detail=True, methods=['post'])
+#     def approuver(self, request, pk=None):
+#         demande = self.get_object()
+#         coordinateur_id = request.data.get('coordinateur_id')
+#         commentaire = request.data.get('commentaire', '')
+#         try:
+#             demande.approuver(coordinateur_id=coordinateur_id, commentaire=commentaire)
+#             serializer = self.get_serializer(demande)
+#             return Response(serializer.data)
+#         except Exception as e:
+#             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['post'])
-    def rejeter(self, request, pk=None):
-        demande = self.get_object()
-        coordinateur_id = request.data.get('coordinateur_id')
-        commentaire = request.data.get('commentaire', '')
-        try:
-            demande.rejeter(coordinateur_id=coordinateur_id, commentaire=commentaire)
-            serializer = self.get_serializer(demande)
-            return Response(serializer.data)
-        except Exception as e:
-            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+#     @action(detail=True, methods=['post'])
+#     def rejeter(self, request, pk=None):
+#         demande = self.get_object()
+#         coordinateur_id = request.data.get('coordinateur_id')
+#         commentaire = request.data.get('commentaire', '')
+#         try:
+#             demande.rejeter(coordinateur_id=coordinateur_id, commentaire=commentaire)
+#             serializer = self.get_serializer(demande)
+#             return Response(serializer.data)
+#         except Exception as e:
+#             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # =======================================
 # ViewSet Depense
 # =======================================
-class DepenseViewSet(viewsets.ModelViewSet):
-    queryset = Depense.objects.all().order_by('-date_creation')
-    serializer_class = DepenseSerializer
-    permission_classes = [IsAuthenticated]
+# class DepenseViewSet(viewsets.ModelViewSet):
+#     queryset = Depense.objects.all().order_by('-date_creation')
+#     serializer_class = DepenseSerializer
+#     permission_classes = [IsAuthenticated]
 
-    @action(detail=True, methods=['post'])
-    def marquer_payee(self, request, pk=None):
-        depense = self.get_object()
-        try:
-            depense.marquer_payee()
-            serializer = self.get_serializer(depense)
-            return Response(serializer.data)
-        except Exception as e:
-            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+#     @action(detail=True, methods=['post'])
+#     def marquer_payee(self, request, pk=None):
+#         depense = self.get_object()
+#         try:
+#             depense.marquer_payee()
+#             serializer = self.get_serializer(depense)
+#             return Response(serializer.data)
+#         except Exception as e:
+#             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['post'])
-    def annuler(self, request, pk=None):
-        depense = self.get_object()
-        try:
-            depense.annuler()
-            serializer = self.get_serializer(depense)
-            return Response(serializer.data)
-        except Exception as e:
-            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+#     @action(detail=True, methods=['post'])
+#     def annuler(self, request, pk=None):
+#         depense = self.get_object()
+#         try:
+#             depense.annuler()
+#             serializer = self.get_serializer(depense)
+#             return Response(serializer.data)
+#         except Exception as e:
+#             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # =======================================
@@ -112,49 +112,105 @@ class BulletinPaieViewSet(viewsets.ModelViewSet):
 # =======================================
 # ViewSet ValidationDemande
 # =======================================
-class ValidationDemandeViewSet(viewsets.ModelViewSet):
-    queryset = ValidationDemande.objects.all().order_by('-date_reception')
-    serializer_class = ValidationDemandeSerializer
-    permission_classes = [IsAuthenticated]
+# class ValidationDemandeViewSet(viewsets.ModelViewSet):
+#     queryset = ValidationDemande.objects.all().order_by('-date_reception')
+#     serializer_class = ValidationDemandeSerializer
+#     permission_classes = [IsAuthenticated]
 
+#     @action(detail=True, methods=['post'])
+#     def approuver(self, request, pk=None):
+#         validation = self.get_object()
+#         responsable_finance_id = request.data.get('responsable_finance_id')
+#         commentaire = request.data.get('commentaire', '')
+
+#         # Validation UUID
+#         try:
+#             responsable_finance_id = UUID(responsable_finance_id)
+#         except Exception:
+#             return Response({'detail': 'UUID du responsable finance invalide.'}, status=status.HTTP_400_BAD_REQUEST)
+
+#         try:
+#             validation.approuver(responsable_finance_id=responsable_finance_id, commentaire=commentaire)
+#             serializer = self.get_serializer(validation)
+#             return Response(serializer.data)
+#         except ValidationError as e:
+#             return Response({'detail': e.message}, status=status.HTTP_400_BAD_REQUEST)
+#         except Exception as e:
+#             return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+#     @action(detail=True, methods=['post'])
+#     def rejeter(self, request, pk=None):
+#         validation = self.get_object()
+#         responsable_finance_id = request.data.get('responsable_finance_id')
+#         commentaire = request.data.get('commentaire', '')
+
+#         # Validation UUID
+#         try:
+#             responsable_finance_id = UUID(responsable_finance_id)
+#         except Exception:
+#             return Response({'detail': 'UUID du responsable finance invalide.'}, status=status.HTTP_400_BAD_REQUEST)
+
+#         try:
+#             validation.rejeter(responsable_finance_id=responsable_finance_id, commentaire=commentaire)
+#             serializer = self.get_serializer(validation)
+#             return Response(serializer.data)
+#         except ValidationError as e:
+#             return Response({'detail': e.message}, status=status.HTTP_400_BAD_REQUEST)
+#         except Exception as e:
+#             return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+
+
+
+
+
+class DemandeDecaissementViewSet(viewsets.ModelViewSet):
+    queryset = DemandeDecaissement.objects.prefetch_related('depenses', 'validation')
+    serializer_class = DemandeDecaissementSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['statut', 'source_service']
+    search_fields = ['numero', 'description']
+    ordering_fields = ['created_at', 'montant_demande']
+    ordering = ['-created_at']
+
+# ============================================================
+# Depense ViewSet
+# ============================================================
+class DepenseViewSet(viewsets.ModelViewSet):
+    queryset = Depense.objects.select_related('decaissement')
+    serializer_class = DepenseSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['decaissement']
+    search_fields = ['description']
+    ordering_fields = ['created_at', 'montant']
+    ordering = ['-created_at']
+
+# ============================================================
+# ValidationDemande ViewSet
+# ============================================================
+class ValidationDemandeViewSet(viewsets.ModelViewSet):
+    queryset = ValidationDemande.objects.select_related('decaissement')
+    serializer_class = ValidationDemandeSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['approuve']
+    search_fields = ['motif']
+    ordering_fields = ['date_validation']
+    ordering = ['-date_validation']
+
+    # Action pour marquer une validation comme approuvée
     @action(detail=True, methods=['post'])
     def approuver(self, request, pk=None):
         validation = self.get_object()
-        responsable_finance_id = request.data.get('responsable_finance_id')
-        commentaire = request.data.get('commentaire', '')
+        validation.approuve = True
+        validation.save()
+        return Response({'status': 'décaissement approuvé'})
 
-        # Validation UUID
-        try:
-            responsable_finance_id = UUID(responsable_finance_id)
-        except Exception:
-            return Response({'detail': 'UUID du responsable finance invalide.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            validation.approuver(responsable_finance_id=responsable_finance_id, commentaire=commentaire)
-            serializer = self.get_serializer(validation)
-            return Response(serializer.data)
-        except ValidationError as e:
-            return Response({'detail': e.message}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+    # Action pour marquer une validation comme rejetée
     @action(detail=True, methods=['post'])
     def rejeter(self, request, pk=None):
         validation = self.get_object()
-        responsable_finance_id = request.data.get('responsable_finance_id')
-        commentaire = request.data.get('commentaire', '')
-
-        # Validation UUID
-        try:
-            responsable_finance_id = UUID(responsable_finance_id)
-        except Exception:
-            return Response({'detail': 'UUID du responsable finance invalide.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            validation.rejeter(responsable_finance_id=responsable_finance_id, commentaire=commentaire)
-            serializer = self.get_serializer(validation)
-            return Response(serializer.data)
-        except ValidationError as e:
-            return Response({'detail': e.message}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        validation.approuve = False
+        validation.save()
+        return Response({'status': 'décaissement rejeté'})

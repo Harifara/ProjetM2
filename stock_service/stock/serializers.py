@@ -248,7 +248,8 @@ class DemandeAchatSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'numero', 'statut', 'demandeur_id', 'finance_valideur_id',
             'date_validation_finance', 'commentaire_finance',
-            'statut_reception', 'date_reception', 'created_at', 'updated_at'
+            'statut_reception', 'date_reception', 'magasin_reception_id',
+            'created_at', 'updated_at'
         ]
 
     def create(self, validated_data):
@@ -270,8 +271,31 @@ class DemandeAchatSerializer(serializers.ModelSerializer):
         demandeur = self.context['request'].user
         validated_data['demandeur_id'] = demandeur.id
 
-        # Sécuriser types
+        # Assurer le bon type pour quantite et montant
         validated_data['quantite'] = int(validated_data.get('quantite', 1))
         validated_data['montant_estime'] = Decimal(validated_data.get('montant_estime', 0))
 
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        """
+        On autorise uniquement la mise à jour de certains champs avant validation par la finance.
+        """
+        if instance.statut != 'en_attente':
+            raise serializers.ValidationError("Impossible de modifier une demande déjà traitée par la finance.")
+
+        article_id = validated_data.pop('article_id', None)
+        if article_id:
+            try:
+                article = Article.objects.get(id=article_id)
+                instance.article = article
+            except (ObjectDoesNotExist, ValueError):
+                raise serializers.ValidationError({"article_id": "Article introuvable ou UUID invalide."})
+
+        # Champs modifiables
+        instance.quantite = int(validated_data.get('quantite', instance.quantite))
+        instance.montant_estime = Decimal(validated_data.get('montant_estime', instance.montant_estime))
+        instance.justification = validated_data.get('justification', instance.justification)
+
+        instance.save()
+        return instance

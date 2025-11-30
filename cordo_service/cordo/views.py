@@ -1,4 +1,4 @@
-from rest_framework import viewsets, filters, status
+from rest_framework import viewsets, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
@@ -40,9 +40,9 @@ class DossierDecaissementViewSet(viewsets.ModelViewSet):
     queryset = DossierDecaissement.objects.select_related('coordinateur').prefetch_related('historique_validations', 'alertes')
     serializer_class = DossierDecaissementSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['priorite', 'type_decaissement', 'coordinateur']
-    search_fields = ['numero', 'type_decaissement', 'justification']
-    ordering_fields = ['date_reception', 'montant_demande']
+    filterset_fields = ['priorite', 'coordinateur', 'statut']
+    search_fields = ['numero']
+    ordering_fields = ['date_reception', 'date_limite_decision']
     ordering = ['-date_reception']
 
 # ============================================================
@@ -105,7 +105,7 @@ class VueDemandesPendantesViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Vue_DemandesPendantes.objects.all()
     serializer_class = VueDemandesPendantesSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['coordinateur_nom', 'type_decaissement', 'priorite']
+    filterset_fields = ['coordinateur_nom', 'priorite']
     search_fields = ['dossier_numero', 'demande_numero']
     ordering_fields = ['date_reception', 'jours_restants']
     ordering = ['-date_reception']
