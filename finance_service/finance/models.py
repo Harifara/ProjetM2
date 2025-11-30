@@ -4,139 +4,6 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from decimal import Decimal
 
-# ============================================================
-# 📋 Types de demande de décaissement
-# ============================================================
-class TypeDecaissement(models.Model):
-    TYPE_CHOICES = [
-        ('salaire', 'Salaire'),
-        ('achat', 'Achat'),
-        ('location', 'Location'),
-        ('electricite', 'Électricité'),
-        ('mission', 'Mission'),
-        ('autre', 'Autre'),
-    ]
-    
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    nom = models.CharField(max_length=100, unique=True)
-    type_decaissement = models.CharField(max_length=50, choices=TYPE_CHOICES)
-    description = models.TextField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'types_decaissement'
-        verbose_name = 'Type de Décaissement'
-        verbose_name_plural = 'Types de Décaissement'
-        ordering = ['nom']
-
-    def __str__(self):
-        return self.nom
-
-# ============================================================
-# 💰 Demande de Décaissement (envoyée au Coordinateur)
-# ============================================================
-class DemandeDecaissement(models.Model):
-    STATUT_CHOICES = [
-        ('en_attente', 'En attente'),
-        ('approuve', 'Approuvé'),
-        ('rejete', 'Rejeté'),
-    ]
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    numero = models.CharField(max_length=100, unique=True, blank=True)
-    type_decaissement = models.ForeignKey(
-        TypeDecaissement, 
-        on_delete=models.PROTECT, 
-        related_name='demandes_decaissement'
-    )
-    
-    # Responsable finance qui fait la demande
-    demandeur_finance_id = models.UUIDField(
-        help_text="UUID du responsable finance (depuis auth_service)"
-    )
-    
-    # Coordinateur qui valide
-    validateur_coordinateur_id = models.UUIDField(
-        null=True, 
-        blank=True,
-        help_text="UUID du coordinateur qui valide (depuis auth_service)"
-    )
-    
-    montant_demande = models.DecimalField(max_digits=15, decimal_places=2)
-    justification = models.TextField()
-    statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='en_attente')
-    
-    date_demande = models.DateTimeField(auto_now_add=True)
-    date_validation = models.DateTimeField(null=True, blank=True)
-    commentaire_validation = models.TextField(blank=True)
-    
-    # Références vers entités externes (optionnel selon le type)
-    demande_rh_id = models.UUIDField(
-        null=True, 
-        blank=True,
-        help_text="UUID de la demande RH (contrat, congé, etc.)"
-    )
-    demande_stock_id = models.UUIDField(
-        null=True, 
-        blank=True,
-        help_text="UUID de la demande d'achat (depuis stock_service)"
-    )
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'demandes_decaissement'
-        verbose_name = 'Demande de Décaissement'
-        verbose_name_plural = 'Demandes de Décaissement'
-        ordering = ['-date_demande']
-
-    def save(self, *args, **kwargs):
-        if not self.numero:
-            self.numero = f"DEC-{uuid.uuid4().hex[:8].upper()}"
-        super().save(*args, **kwargs)
-
-    def approuver(self, coordinateur_id: uuid.UUID, commentaire: str = ''):
-        """Approuve la demande par le coordinateur et crée une dépense."""
-        if self.statut != 'en_attente':
-            raise ValidationError("Cette demande a déjà été traitée.")
-        
-        self.statut = 'approuve'
-        self.validateur_coordinateur_id = coordinateur_id
-        self.date_validation = timezone.now()
-        self.commentaire_validation = commentaire
-        self.save()
-        
-        # Création automatique de la dépense
-        self._creer_depense(self.demandeur_finance_id)
-
-    def rejeter(self, coordinateur_id: uuid.UUID, commentaire: str = ''):
-        """Rejette la demande par le coordinateur."""
-        if self.statut != 'en_attente':
-            raise ValidationError("Cette demande a déjà été traitée.")
-        
-        self.statut = 'rejete'
-        self.validateur_coordinateur_id = coordinateur_id
-        self.date_validation = timezone.now()
-        self.commentaire_validation = commentaire
-        self.save()
-
-    def _creer_depense(self, responsable_finance_id: uuid.UUID):
-        """Crée automatiquement une dépense après validation du coordinateur."""
-        depense = Depense.objects.create(
-            demande_decaissement=self,
-            type_depense=self.type_decaissement,
-            montant=self.montant_demande,
-            description=self.justification,
-            responsable_finance_id=responsable_finance_id,
-            demande_rh_id=self.demande_rh_id,
-            demande_stock_id=self.demande_stock_id,
-        )
-        return depense
-
-    def __str__(self):
-        return f"{self.numero} - {self.montant_demande} Ar ({self.statut})"
 
 # ============================================================
 # 💸 Dépense (créée APRÈS approbation d'une DemandeDecaissement)
@@ -298,6 +165,39 @@ class BulletinPaie(models.Model):
     def __str__(self):
         return f"{self.numero} - {self.mois}/{self.annee}"
 
+import uuid
+from decimal import Decimal
+from django.db import models
+from django.core.exceptions import ValidationError
+from django.utils import timezone
+
+# ============================================================
+# 📋 Types de Décaissement
+# ============================================================
+class TypeDecaissement(models.Model):
+    TYPE_CHOICES = [
+        ('salaire', 'Salaire'),
+        ('achat', 'Achat'),
+        ('location', 'Location'),
+        ('electricite', 'Électricité'),
+        ('mission', 'Mission'),
+        ('autre', 'Autre'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    nom = models.CharField(max_length=100, unique=True)
+    type_decaissement = models.CharField(max_length=50, choices=TYPE_CHOICES)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'types_decaissement'
+        ordering = ['nom']
+
+    def __str__(self):
+        return self.nom
+
 # ============================================================
 # 🧾 Validation des Demandes RH/Stock par Finance
 # ============================================================
@@ -316,27 +216,20 @@ class ValidationDemande(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     numero = models.CharField(max_length=100, unique=True, blank=True)
     type_demande = models.CharField(max_length=50, choices=TYPE_DEMANDE_CHOICES)
-    
-    # ID de la demande dans le service d'origine
-    demande_origine_id = models.UUIDField(help_text="UUID de la demande d'origine (RH ou Stock)")
+    demande_origine_id = models.UUIDField(help_text="UUID de la demande d'origine")
     service_origine = models.CharField(max_length=50, choices=[('rh_service', 'RH'), ('stock_service', 'Stock')])
-    
     montant = models.DecimalField(max_digits=15, decimal_places=2)
     description = models.TextField()
     statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='en_attente')
-    
     validateur_finance_id = models.UUIDField(null=True, blank=True, help_text="UUID du responsable finance")
     date_reception = models.DateTimeField(auto_now_add=True)
     date_validation = models.DateTimeField(null=True, blank=True)
     commentaire_validation = models.TextField(blank=True)
-    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'validations_demandes'
-        verbose_name = 'Validation de Demande RH/Stock'
-        verbose_name_plural = 'Validations de Demandes RH/Stock'
         ordering = ['-date_reception']
 
     def save(self, *args, **kwargs):
@@ -347,35 +240,28 @@ class ValidationDemande(models.Model):
     def approuver(self, responsable_finance_id: uuid.UUID, commentaire: str = ''):
         if self.statut != 'en_attente':
             raise ValidationError("Cette demande a déjà été traitée.")
-        
         self.statut = 'approuve'
         self.validateur_finance_id = responsable_finance_id
         self.date_validation = timezone.now()
         self.commentaire_validation = commentaire
         self.save()
-        
-        # 🔹 Mettre à jour le service d'origine
         self._update_service_origine('approuve')
 
     def rejeter(self, responsable_finance_id: uuid.UUID, commentaire: str = ''):
         if self.statut != 'en_attente':
             raise ValidationError("Cette demande a déjà été traitée.")
-        
         self.statut = 'rejete'
         self.validateur_finance_id = responsable_finance_id
         self.date_validation = timezone.now()
         self.commentaire_validation = commentaire
         self.save()
-        
-        # 🔹 Mettre à jour le service d'origine
         self._update_service_origine('rejete')
 
     def _update_service_origine(self, statut_finance):
-        """Synchronise le statut dans le service d'origine"""
+        """Met à jour le service d'origine si besoin"""
         if self.service_origine == 'rh_service':
             from rh_service.models import Demande
             demande = Demande.objects.get(id=self.demande_origine_id)
-            # Ajuster le statut selon les règles RH
             demande.status = 'approuve' if statut_finance == 'approuve' else 'refuse'
             demande.save()
         elif self.service_origine == 'stock_service':
@@ -387,5 +273,97 @@ class ValidationDemande(models.Model):
             demande.commentaire_finance = self.commentaire_validation
             demande.save()
 
-    def __str__(self):
-        return f"{self.numero} - {self.type_demande} ({self.statut})"
+    def creer_demande_decaissement(self, responsable_finance_id: uuid.UUID):
+        """Crée une demande de décaissement depuis cette ValidationDemande"""
+        from .models_decaissement import DemandeDecaissement, TypeDecaissement
+        
+        if self.statut != 'approuve':
+            raise ValidationError("Seules les demandes approuvées peuvent être envoyées en décaissement.")
+        
+        # Déterminer le type de décaissement
+        if self.type_demande == 'rh':
+            type_dec, _ = TypeDecaissement.objects.get_or_create(
+                nom='Salaire',
+                defaults={'type_decaissement': 'salaire'}
+            )
+        else:
+            type_dec, _ = TypeDecaissement.objects.get_or_create(
+                nom='Achat',
+                defaults={'type_decaissement': 'achat'}
+            )
+        
+        return DemandeDecaissement.objects.create(
+            type_decaissement=type_dec,
+            demandeur_finance_id=responsable_finance_id,
+            montant_demande=self.montant,
+            justification=self.description,
+            demande_rh_id=self.demande_origine_id if self.type_demande == 'rh' else None,
+            demande_stock_id=self.demande_origine_id if self.type_demande == 'achat_stock' else None,
+            statut='en_attente'
+        )
+
+# ============================================================
+# 💰 Demande de Décaissement
+# ============================================================
+class DemandeDecaissement(models.Model):
+    STATUT_CHOICES = [
+        ('en_attente', 'En attente'),
+        ('approuve', 'Approuvé'),
+        ('rejete', 'Rejeté'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    numero = models.CharField(max_length=100, unique=True, blank=True)
+    type_decaissement = models.ForeignKey(TypeDecaissement, on_delete=models.PROTECT, related_name='demandes_decaissement')
+    demandeur_finance_id = models.UUIDField(help_text="UUID du responsable finance")
+    validateur_coordinateur_id = models.UUIDField(null=True, blank=True, help_text="UUID du coordinateur")
+    montant_demande = models.DecimalField(max_digits=15, decimal_places=2)
+    justification = models.TextField()
+    statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='en_attente')
+    date_demande = models.DateTimeField(auto_now_add=True)
+    date_validation = models.DateTimeField(null=True, blank=True)
+    commentaire_validation = models.TextField(blank=True)
+    demande_rh_id = models.UUIDField(null=True, blank=True)
+    demande_stock_id = models.UUIDField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'demandes_decaissement'
+        ordering = ['-date_demande']
+
+    def save(self, *args, **kwargs):
+        if not self.numero:
+            self.numero = f"DEC-{uuid.uuid4().hex[:8].upper()}"
+        super().save(*args, **kwargs)
+
+    def approuver(self, coordinateur_id: uuid.UUID, commentaire: str = ''):
+        if self.statut != 'en_attente':
+            raise ValidationError("Cette demande a déjà été traitée.")
+        self.statut = 'approuve'
+        self.validateur_coordinateur_id = coordinateur_id
+        self.date_validation = timezone.now()
+        self.commentaire_validation = commentaire
+        self.save()
+        self._creer_depense(self.demandeur_finance_id)
+
+    def rejeter(self, coordinateur_id: uuid.UUID, commentaire: str = ''):
+        if self.statut != 'en_attente':
+            raise ValidationError("Cette demande a déjà été traitée.")
+        self.statut = 'rejete'
+        self.validateur_coordinateur_id = coordinateur_id
+        self.date_validation = timezone.now()
+        self.commentaire_validation = commentaire
+        self.save()
+
+    def _creer_depense(self, responsable_finance_id: uuid.UUID):
+        from .models_decaissement import Depense
+        return Depense.objects.create(
+            demande_decaissement=self,
+            type_depense=self.type_decaissement,
+            montant=self.montant_demande,
+            description=self.justification,
+            responsable_finance_id=responsable_finance_id,
+            demande_rh_id=self.demande_rh_id,
+            demande_stock_id=self.demande_stock_id,
+        )

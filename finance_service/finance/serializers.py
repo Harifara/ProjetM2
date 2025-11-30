@@ -8,42 +8,6 @@ from .models import (
 )
 
 
-# =========================
-# Serializer TypeDecaissement
-# =========================
-class TypeDecaissementSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TypeDecaissement
-        fields = [
-            'id', 'nom', 'type_decaissement', 'description',
-            'created_at', 'updated_at'
-        ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
-
-
-# =========================
-# Serializer DemandeDecaissement
-# =========================
-class DemandeDecaissementSerializer(serializers.ModelSerializer):
-    type_decaissement = TypeDecaissementSerializer(read_only=True)
-    type_decaissement_id = serializers.PrimaryKeyRelatedField(
-        queryset=TypeDecaissement.objects.all(),
-        source='type_decaissement',
-        write_only=True
-    )
-
-    class Meta:
-        model = DemandeDecaissement
-        fields = [
-            'id', 'numero', 'type_decaissement', 'type_decaissement_id',
-            'demandeur_finance_id', 'validateur_coordinateur_id',
-            'montant_demande', 'justification', 'statut',
-            'date_demande', 'date_validation', 'commentaire_validation',
-            'demande_rh_id', 'demande_stock_id',
-            'created_at', 'updated_at'
-        ]
-        read_only_fields = ['id', 'numero', 'date_demande', 'date_validation', 'created_at', 'updated_at']
-
 
 # =========================
 # Serializer Depense
@@ -96,16 +60,96 @@ class BulletinPaieSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'numero', 'salaire_net', 'date_generation', 'date_validation', 'created_at', 'updated_at']
 
 
-# =========================
-# Serializer ValidationDemande
-# =========================
+# ============================================================
+# Serializer pour TypeDecaissement
+# ============================================================
+class TypeDecaissementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TypeDecaissement
+        fields = [
+            'id',
+            'nom',
+            'type_decaissement',
+            'description',
+            'created_at',
+            'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+# ============================================================
+# Serializer pour ValidationDemande
+# ============================================================
 class ValidationDemandeSerializer(serializers.ModelSerializer):
+    # Affichage du type de demande en clair
+    type_demande_display = serializers.CharField(source='get_type_demande_display', read_only=True)
+    statut_display = serializers.CharField(source='get_statut_display', read_only=True)
+
     class Meta:
         model = ValidationDemande
         fields = [
-            'id', 'numero', 'type_demande', 'demande_origine_id', 'service_origine',
-            'montant', 'description', 'statut', 'validateur_finance_id',
-            'date_reception', 'date_validation', 'commentaire_validation',
-            'created_at', 'updated_at'
+            'id',
+            'numero',
+            'type_demande',
+            'type_demande_display',
+            'demande_origine_id',
+            'service_origine',
+            'montant',
+            'description',
+            'statut',
+            'statut_display',
+            'validateur_finance_id',
+            'date_reception',
+            'date_validation',
+            'commentaire_validation',
+            'created_at',
+            'updated_at',
         ]
-        read_only_fields = ['id', 'numero', 'date_reception', 'date_validation', 'created_at', 'updated_at']
+        read_only_fields = [
+            'id',
+            'numero',
+            'date_reception',
+            'date_validation',
+            'created_at',
+            'updated_at',
+            'type_demande_display',
+            'statut_display'
+        ]
+
+# ============================================================
+# Serializer pour DemandeDecaissement
+# ============================================================
+class DemandeDecaissementSerializer(serializers.ModelSerializer):
+    type_decaissement_detail = TypeDecaissementSerializer(source='type_decaissement', read_only=True)
+    statut_display = serializers.CharField(source='get_statut_display', read_only=True)
+
+    class Meta:
+        model = DemandeDecaissement
+        fields = [
+            'id',
+            'numero',
+            'type_decaissement',
+            'type_decaissement_detail',
+            'demandeur_finance_id',
+            'validateur_coordinateur_id',
+            'montant_demande',
+            'justification',
+            'statut',
+            'statut_display',
+            'date_demande',
+            'date_validation',
+            'commentaire_validation',
+            'demande_rh_id',
+            'demande_stock_id',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = [
+            'id',
+            'numero',
+            'date_demande',
+            'date_validation',
+            'created_at',
+            'updated_at',
+            'type_decaissement_detail',
+            'statut_display'
+        ]
