@@ -1,3 +1,4 @@
+from uuid import UUID
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -19,10 +20,17 @@ from .serializers import (
 )
 
 
+# =======================================
+# ViewSet pour TypeDecaissement
+# =======================================
+class TypeDecaissementViewSet(viewsets.ModelViewSet):
+    queryset = TypeDecaissement.objects.all().order_by('nom')
+    serializer_class = TypeDecaissementSerializer
+    permission_classes = [IsAuthenticated]
 
 
 # =======================================
-# ViewSet Depense
+# ViewSet pour Depense
 # =======================================
 class DepenseViewSet(viewsets.ModelViewSet):
     queryset = Depense.objects.all().order_by('-date_creation')
@@ -51,7 +59,7 @@ class DepenseViewSet(viewsets.ModelViewSet):
 
 
 # =======================================
-# ViewSet BulletinPaie
+# ViewSet pour BulletinPaie
 # =======================================
 class BulletinPaieViewSet(viewsets.ModelViewSet):
     queryset = BulletinPaie.objects.all().order_by('-annee', '-mois')
@@ -69,12 +77,13 @@ class BulletinPaieViewSet(viewsets.ModelViewSet):
             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-# ============================================================
+# =======================================
 # ViewSet pour ValidationDemande
-# ============================================================
+# =======================================
 class ValidationDemandeViewSet(viewsets.ModelViewSet):
     queryset = ValidationDemande.objects.all().order_by('-date_reception')
     serializer_class = ValidationDemandeSerializer
+    permission_classes = [IsAuthenticated]
 
     @action(detail=True, methods=['post'])
     def approuver(self, request, pk=None):
@@ -119,18 +128,19 @@ class ValidationDemandeViewSet(viewsets.ModelViewSet):
 
         try:
             decaissement = instance.creer_demande_decaissement(responsable_finance_id=UUID(responsable_finance_id))
-            from .serializers import DemandeDecaissementSerializer
             serializer = DemandeDecaissementSerializer(decaissement)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-# ============================================================
+
+# =======================================
 # ViewSet pour DemandeDecaissement
-# ============================================================
+# =======================================
 class DemandeDecaissementViewSet(viewsets.ModelViewSet):
     queryset = DemandeDecaissement.objects.all().order_by('-date_demande')
     serializer_class = DemandeDecaissementSerializer
+    permission_classes = [IsAuthenticated]
 
     @action(detail=True, methods=['post'])
     def approuver(self, request, pk=None):

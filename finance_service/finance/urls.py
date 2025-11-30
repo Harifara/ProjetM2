@@ -8,7 +8,7 @@ from .views import (
     ValidationDemandeViewSet
 )
 
-# Création du router
+# Création du router REST
 router = DefaultRouter()
 router.register(r'types-decaissement', TypeDecaissementViewSet, basename='type-decaissement')
 router.register(r'demandes-decaissement', DemandeDecaissementViewSet, basename='demande-decaissement')
