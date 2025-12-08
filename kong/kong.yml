@@ -2,7 +2,7 @@ _format_version: "3.0"
 _transform: true
 
 # ============================
-# 🔐 CONSUMERS (JWT)
+# CONSUMERS (JWT)
 # ============================
 consumers:
   - username: auth-service
@@ -13,7 +13,7 @@ consumers:
         secret: my_super_secret_key_123
 
 # ============================
-# 🚪 SERVICES + ROUTES
+# SERVICES + ROUTES
 # ============================
 services:
 
