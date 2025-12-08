@@ -1,7 +1,7 @@
 from django.db import models
 import uuid
 from decimal import Decimal
-from django.utils import timezone
+from django.core.validators import MinValueValidator
 
 # =====================================
 # 💰 Demande de décaissement
@@ -30,17 +30,19 @@ class DemandeDecaissement(models.Model):
 
     def calculer_total(self):
         """Calcul automatique du montant total à partir des items."""
-        self.total_montant = sum(item.montant for item in self.items.all())
+        total = sum((item.montant for item in self.items.all()), Decimal('0.00'))
+        self.total_montant = total
         self.save()
 
     def mettre_a_jour_statut(self):
         """Mise à jour automatique du statut global selon les items."""
         items = self.items.all()
-        if all(item.statut == 'valide' for item in items):
+        statuts = set(item.statut for item in items)
+        if statuts == {'valide'}:
             self.statut = 'valide'
-        elif any(item.statut == 'valide' for item in items):
+        elif 'valide' in statuts:
             self.statut = 'partiellement_valide'
-        elif all(item.statut == 'rejete' for item in items):
+        elif statuts == {'rejete'}:
             self.statut = 'rejete'
         else:
             self.statut = 'en_attente'
@@ -60,7 +62,9 @@ class DemandeDecaissementItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     decaissement = models.ForeignKey(DemandeDecaissement, on_delete=models.CASCADE, related_name='items')
     description = models.TextField()
-    montant = models.DecimalField(max_digits=15, decimal_places=2)
+    montant = models.DecimalField(
+        max_digits=15, decimal_places=2, validators=[MinValueValidator(0.01)]
+    )
     statut = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente')
 
     def __str__(self):
@@ -87,3 +91,13 @@ class Depense(models.Model):
         return f"Dépense {self.id} - {self.montant}"
 
 
+# =====================================
+# 🔔 Signaux pour mise à jour automatique
+# =====================================
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+
+@receiver([post_save, post_delete], sender=DemandeDecaissementItem)
+def update_decaissement_total(sender, instance, **kwargs):
+    instance.decaissement.calculer_total()
+    instance.decaissement.mettre_a_jour_statut()

@@ -15,6 +15,10 @@ class DemandeDecaissementItemSerializer(serializers.ModelSerializer):
 # ----------------------------
 class DemandeDecaissementSerializer(serializers.ModelSerializer):
     items = DemandeDecaissementItemSerializer(many=True, read_only=True)
+    total_items = serializers.SerializerMethodField()
+
+    def get_total_items(self, obj):
+        return sum(item.montant for item in obj.items.all())
 
     class Meta:
         model = DemandeDecaissement
@@ -25,6 +29,7 @@ class DemandeDecaissementSerializer(serializers.ModelSerializer):
             'date_creation',
             'statut',
             'total_montant',
+            'total_items',
             'created_by',
             'items'
         ]
@@ -37,5 +42,3 @@ class DepenseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Depense
         fields = ['id', 'item_decaissement', 'montant', 'date_creation', 'statut_paiement']
-
-
