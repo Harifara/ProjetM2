@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import DemandeDecaissement, DemandeDecaissementItem, Depense
-from coordinator.models import ValidationCoordinateur
+# from cordo_service.cordo.models import ValidationCoordinateur
 
 # ------------------------
 # Serializer Item Décaissement
