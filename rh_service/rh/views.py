@@ -66,12 +66,14 @@ class EmployerViewSet(viewsets.ModelViewSet):
     search_fields = ['nom_employer', 'prenom_employer', 'email', 'domaine_etude']
     ordering_fields = ['nom_employer', 'date_entree', 'created_at']
 
+    # LISTE DES EMPLOYÉS ACTIFS
     @action(detail=False, methods=['get'])
     def actifs(self, request):
         queryset = self.queryset.filter(status_employer='actif')
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+    # CHANGER LE STATUT
     @action(detail=True, methods=['post'])
     def change_status(self, request, pk=None):
         employer = self.get_object()
@@ -82,6 +84,26 @@ class EmployerViewSet(viewsets.ModelViewSet):
         employer.save()
         serializer = self.get_serializer(employer)
         return Response(serializer.data)
+
+    # 🔥 CORRECTION IMPORTANTE : UPDATE + UPLOAD FICHIER
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+
+        # Si le frontend envoie une nouvelle image → la remplacer
+        if 'photo_profil' in request.FILES:
+            instance.photo_profil = request.FILES['photo_profil']
+
+        # Si le frontend envoie un nouveau CV → le remplacer
+        if 'cv' in request.FILES:
+            instance.cv = request.FILES['cv']
+
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response(serializer.data)
+
 
 class AffectationViewSet(viewsets.ModelViewSet):
     queryset = Affectation.objects.select_related(
