@@ -3,6 +3,9 @@ import uuid
 from decimal import Decimal
 from django.utils import timezone
 
+# =====================================
+# 💰 Demande de décaissement
+# =====================================
 class DemandeDecaissement(models.Model):
     STATUS_CHOICES = [
         ('en_attente', 'En attente'),
@@ -12,8 +15,8 @@ class DemandeDecaissement(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    source_demande_rh = models.ForeignKey('rh.Demande', on_delete=models.SET_NULL, null=True, blank=True, related_name='decaissements')
-    source_demande_stock = models.ForeignKey('stock.DemandeAchat', on_delete=models.SET_NULL, null=True, blank=True, related_name='decaissements')
+    source_demande_rh_id = models.UUIDField(null=True, blank=True, help_text="UUID de la demande RH")
+    source_demande_stock_id = models.UUIDField(null=True, blank=True, help_text="UUID de la demande Stock")
     date_creation = models.DateTimeField(auto_now_add=True)
     statut = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente')
     total_montant = models.DecimalField(max_digits=15, decimal_places=2, default=0)
@@ -44,7 +47,9 @@ class DemandeDecaissement(models.Model):
         self.save()
 
 
-
+# =====================================
+# 📝 Items de décaissement
+# =====================================
 class DemandeDecaissementItem(models.Model):
     STATUS_CHOICES = [
         ('en_attente', 'En attente'),
@@ -62,7 +67,9 @@ class DemandeDecaissementItem(models.Model):
         return f"{self.description} - {self.montant} - {self.statut}"
 
 
-
+# =====================================
+# 💵 Dépenses liées aux items
+# =====================================
 class Depense(models.Model):
     STATUS_CHOICES = [
         ('en_attente', 'En attente de paiement'),
@@ -78,3 +85,5 @@ class Depense(models.Model):
 
     def __str__(self):
         return f"Dépense {self.id} - {self.montant}"
+
+
