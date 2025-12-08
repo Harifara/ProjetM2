@@ -56,7 +56,7 @@ services:
     url: http://rh_service:8000
     routes:
       - name: rh-route
-        paths: ["/api/rh"]
+        paths: ["/api/rh", "/media"]
         strip_path: false
         preserve_host: true
         protocols: ["http", "https"]
