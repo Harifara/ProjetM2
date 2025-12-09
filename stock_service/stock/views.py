@@ -12,12 +12,6 @@ from rest_framework.permissions import IsAuthenticated
 import uuid
 import logging
 
-
-
-
-
-
-
 from django.core.exceptions import ValidationError
 from rest_framework.decorators import api_view
 from .models import (

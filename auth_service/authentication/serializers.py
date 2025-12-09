@@ -4,7 +4,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import User, AuditLog, Notification, UserRole
 
 # ==============================
-# 👤 Sérialiseur principal User
+#  Sérialiseur principal User
 # ==============================
 class UserSerializer(serializers.ModelSerializer):
     class Meta:

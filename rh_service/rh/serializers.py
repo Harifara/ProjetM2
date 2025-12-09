@@ -8,8 +8,6 @@ from .models import (
 from django.utils import timezone
 
 
-
-
 class DistrictSerializer(serializers.ModelSerializer):
     class Meta:
         model = District
