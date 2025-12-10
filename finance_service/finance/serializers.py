@@ -1,8 +1,8 @@
 from rest_framework import serializers
-from .models import DemandeDecaissement, Depense
+from .models import DemandeDecaissement, Depense, DepenseFinale
 
 # ----------------------------
-# Serializer pour les dépenses (items)
+# Serializer pour les Dépenses
 # ----------------------------
 class DepenseSerializer(serializers.ModelSerializer):
     class Meta:
@@ -10,28 +10,42 @@ class DepenseSerializer(serializers.ModelSerializer):
         fields = ['id', 'description', 'montant', 'statut', 'date_creation']
         read_only_fields = ['id', 'date_creation']
 
+
 # ----------------------------
-# Serializer pour les demandes de décaissement
+# Serializer pour les Dépenses Finales
+# ----------------------------
+class DepenseFinaleSerializer(serializers.ModelSerializer):
+    depense = DepenseSerializer(read_only=True)
+
+    class Meta:
+        model = DepenseFinale
+        fields = ['id', 'depense', 'montant', 'date_creation', 'paye']
+        read_only_fields = ['id', 'depense', 'date_creation']
+
+
+# ----------------------------
+# Serializer pour les Demandes de Décaissement
 # ----------------------------
 class DemandeDecaissementSerializer(serializers.ModelSerializer):
     depenses = DepenseSerializer(many=True, read_only=True)
     total_items = serializers.SerializerMethodField()
-    statut = serializers.CharField(read_only=True)  # Propriété calculée
+    statut = serializers.CharField(read_only=True)
 
     class Meta:
         model = DemandeDecaissement
         fields = [
             'id',
             'source_service',
-            'date_creation',
             'created_by',
+            'date_creation',
+            'envoyee',
             'total_montant',
             'statut',
-            'envoyee',
             'total_items',
             'depenses'
         ]
-        read_only_fields = ['id', 'date_creation', 'total_montant', 'statut']
+        read_only_fields = ['id', 'date_creation', 'total_montant', 'statut', 'total_items']
 
     def get_total_items(self, obj):
-        return sum(depense.montant for depense in obj.depenses.all())
+        """Retourne le montant total de toutes les dépenses liées."""
+        return sum(dep.montant for dep in obj.depenses.all())

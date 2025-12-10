@@ -1,8 +1,8 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from .models import DemandeDecaissement, Depense
-from .serializers import DemandeDecaissementSerializer, DepenseSerializer
+from .models import DemandeDecaissement, Depense, DepenseFinale
+from .serializers import DemandeDecaissementSerializer, DepenseSerializer, DepenseFinaleSerializer
 from django.db.models import Q
 
 # ===========================
@@ -13,10 +13,7 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
     serializer_class = DemandeDecaissementSerializer
 
     def get_queryset(self):
-        """
-        Filtrer selon source_service si nécessaire,
-        et trier par date_creation décroissante.
-        """
+        """Filtrer par source_service si passé en query param"""
         qs = super().get_queryset()
         source_service = self.request.query_params.get('source_service')
         if source_service:
@@ -25,11 +22,11 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         """
-        Créer une demande de décaissement et lier les dépenses
-        non encore envoyées du service correspondant.
+        Crée une demande de décaissement par le service finance.
+        Les dépenses liées sont encore en attente jusqu'à validation coordo.
         """
         source_service = request.data.get('source_service')
-        created_by = request.data.get('created_by')  # UUID de l'utilisateur
+        created_by = request.data.get('created_by')
 
         if not source_service or not created_by:
             return Response(
@@ -37,27 +34,12 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Créer la demande
         demande = DemandeDecaissement.objects.create(
             source_service=source_service,
             created_by=created_by,
             total_montant=0,
-            envoyee=True  # la demande est maintenant envoyée
+            envoyee=True  # La demande est envoyée au coordonnateur
         )
-
-        # Récupérer les dépenses du service qui ne sont pas encore envoyées
-        depenses_non_envoyees = Depense.objects.filter(
-            demande__isnull=True,
-            description__icontains=source_service  # optionnel selon ton flux
-        )
-
-        # Lier les dépenses à cette demande
-        for depense in depenses_non_envoyees:
-            depense.demande = demande
-            depense.save()
-
-        # Calculer le total automatiquement
-        demande.calculer_total()
 
         serializer = self.get_serializer(demande)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -65,13 +47,14 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def valider(self, request, pk=None):
         """
-        Valider toutes les dépenses de la demande
+        Valider toutes les dépenses d'une demande par le coordonnateur.
+        Une fois validées, elles deviennent des DepenseFinale.
         """
         demande = self.get_object()
         depenses = demande.depenses.all()
         for dep in depenses:
             dep.statut = 'valide'
-            dep.save()
+            dep.save()  # Le signal créera automatiquement DepenseFinale
         demande.calculer_total()
         serializer = self.get_serializer(demande)
         return Response(serializer.data)
@@ -79,16 +62,32 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def rejeter(self, request, pk=None):
         """
-        Rejeter toutes les dépenses de la demande
+        Rejeter toutes les dépenses d'une demande par le coordonnateur.
         """
         commentaire = request.data.get('commentaire', '')
         demande = self.get_object()
         depenses = demande.depenses.all()
         for dep in depenses:
             dep.statut = 'rejete'
-            dep.save()
             if commentaire:
                 dep.description += f" (Rejet: {commentaire})"
+            dep.save()
         demande.calculer_total()
         serializer = self.get_serializer(demande)
         return Response(serializer.data)
+
+
+# ===========================
+# ViewSet pour Depense (optionnel)
+# ===========================
+class DepenseViewSet(viewsets.ModelViewSet):
+    queryset = Depense.objects.all().order_by('-date_creation')
+    serializer_class = DepenseSerializer
+
+
+# ===========================
+# ViewSet pour DepenseFinale (lecture seule)
+# ===========================
+class DepenseFinaleViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = DepenseFinale.objects.all().order_by('-date_creation')
+    serializer_class = DepenseFinaleSerializer
