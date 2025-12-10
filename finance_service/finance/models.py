@@ -2,7 +2,6 @@ from django.db import models
 import uuid
 from decimal import Decimal
 from django.core.validators import MinValueValidator
-from django.utils import timezone
 
 # =====================================
 # 💰 Demande de décaissement
@@ -16,8 +15,8 @@ class DemandeDecaissement(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    source_demande_rh_id = models.UUIDField(null=True, blank=True, help_text="UUID de la demande RH")
-    source_demande_stock_id = models.UUIDField(null=True, blank=True, help_text="UUID de la demande Stock")
+    source_demande_rh_id = models.UUIDField(null=True, blank=True)
+    source_demande_stock_id = models.UUIDField(null=True, blank=True)
     date_creation = models.DateTimeField(auto_now_add=True)
     statut = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente')
     total_montant = models.DecimalField(max_digits=15, decimal_places=2, default=0)
@@ -61,9 +60,7 @@ class DemandeDecaissementItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     decaissement = models.ForeignKey(DemandeDecaissement, on_delete=models.CASCADE, related_name='items')
     description = models.TextField()
-    montant = models.DecimalField(
-        max_digits=15, decimal_places=2, validators=[MinValueValidator(0.01)]
-    )
+    montant = models.DecimalField(max_digits=15, decimal_places=2, validators=[MinValueValidator(0.01)])
     statut = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente')
 
     def __str__(self):
@@ -98,16 +95,6 @@ from django.dispatch import receiver
 
 @receiver(post_save, sender=DemandeDecaissementItem)
 def handle_item_validation(sender, instance, **kwargs):
-    """
-    Après mise à jour d'un item :
-    - Met à jour le statut global du décaissement
-    - Crée une dépense si l'item est valide et n'a pas encore de dépense
-    """
     instance.decaissement.mettre_a_jour_statut()
-
-    # Crée une dépense uniquement si l'item est valide et qu'aucune dépense n'existe
     if instance.statut == 'valide' and not hasattr(instance, 'depense'):
-        Depense.objects.create(
-            item_decaissement=instance,
-            montant=instance.montant
-        )
+        Depense.objects.create(item_decaissement=instance, montant=instance.montant)

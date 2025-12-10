@@ -10,18 +10,16 @@ class DepenseSerializer(serializers.ModelSerializer):
         fields = ['id', 'item_decaissement', 'montant', 'date_creation', 'statut_paiement']
         read_only_fields = ['id', 'date_creation']
 
-
 # ----------------------------
 # Serializer pour les items de décaissement
 # ----------------------------
 class DemandeDecaissementItemSerializer(serializers.ModelSerializer):
-    depense = DepenseSerializer(read_only=True)  # inclure la dépense si elle existe
+    depense = DepenseSerializer(read_only=True)
 
     class Meta:
         model = DemandeDecaissementItem
         fields = ['id', 'decaissement', 'description', 'montant', 'statut', 'depense']
         read_only_fields = ['id', 'depense']
-
 
 # ----------------------------
 # Serializer pour les décaissements
@@ -46,5 +44,4 @@ class DemandeDecaissementSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'date_creation', 'statut', 'total_montant']
 
     def get_total_items(self, obj):
-        # Calcule le total des montants des items liés
         return sum(item.montant for item in obj.items.all())

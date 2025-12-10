@@ -14,5 +14,5 @@ router.register(r'depenses', DepenseViewSet, basename='depense')
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('items/<int:item_id>/update-status/', DemandeDecaissementItemUpdateStatusView.as_view(), name='update-item-status'),
+    path('items/<uuid:item_id>/update-status/', DemandeDecaissementItemUpdateStatusView.as_view(), name='update-item-status'),
 ]
