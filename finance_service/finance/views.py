@@ -1,85 +1,61 @@
-from rest_framework import generics, status
+from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import DemandeDecaissement, DemandeDecaissementItem
+from .models import DemandeDecaissement, DemandeDecaissementItem, Depense
 from .serializers import (
     DemandeDecaissementSerializer,
-    DemandeDecaissementItemSerializer
+    DemandeDecaissementItemSerializer,
+    DepenseSerializer
 )
 
 # ----------------------------
-# Liste et création des décaissements
+# ViewSet pour les décaissements
 # ----------------------------
-class DemandeDecaissementListCreateView(generics.ListCreateAPIView):
+class DemandeDecaissementViewSet(viewsets.ModelViewSet):
     queryset = DemandeDecaissement.objects.all()
     serializer_class = DemandeDecaissementSerializer
 
-    def create(self, request, *args, **kwargs):
-        """
-        Création d'un décaissement avec ses items en nested.
-        La création d'items se fait via un champ `items` dans la requête.
-        """
-        items_data = request.data.pop('items', [])
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+    def perform_create(self, serializer):
+        # Crée le décaissement
         decaissement = serializer.save()
-
-        # Crée les items
-        for item in items_data:
+        items_data = self.request.data.get('items', [])
+        for item_data in items_data:
             DemandeDecaissementItem.objects.create(
                 decaissement=decaissement,
-                **item
+                **item_data
             )
-
         decaissement.calculer_total()
         decaissement.mettre_a_jour_statut()
 
-        return Response(
-            self.get_serializer(decaissement).data,
-            status=status.HTTP_201_CREATED
-        )
-
 # ----------------------------
-# Détail d’un décaissement
+# ViewSet pour les items de décaissement
 # ----------------------------
-class DemandeDecaissementDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = DemandeDecaissement.objects.all()
-    serializer_class = DemandeDecaissementSerializer
-    lookup_field = 'id'
-
-# ----------------------------
-# Liste et création des items (optionnel)
-# ----------------------------
-class DemandeDecaissementItemListCreateView(generics.ListCreateAPIView):
+class DemandeDecaissementItemViewSet(viewsets.ModelViewSet):
     queryset = DemandeDecaissementItem.objects.all()
     serializer_class = DemandeDecaissementItemSerializer
 
-    def create(self, request, *args, **kwargs):
-        """
-        Création d'un item pour un décaissement existant
-        """
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+    def perform_create(self, serializer):
         item = serializer.save()
-
-        # Mettre à jour le décaissement parent
+        # Met à jour le décaissement parent
         item.decaissement.calculer_total()
         item.decaissement.mettre_a_jour_statut()
 
-        return Response(
-            self.get_serializer(item).data,
-            status=status.HTTP_201_CREATED
-        )
+# ----------------------------
+# ViewSet pour les dépenses
+# ----------------------------
+class DepenseViewSet(viewsets.ModelViewSet):
+    queryset = Depense.objects.all()
+    serializer_class = DepenseSerializer
 
 # ----------------------------
-# Mise à jour du statut d’un item (validation par coordinateur)
+# API pour mettre à jour le statut d’un item (coordinateur)
 # ----------------------------
 class DemandeDecaissementItemUpdateStatusView(APIView):
+    """
+    Endpoint pour mettre à jour le statut d'un item de décaissement.
+    Exemple de payload: {"statut": "valide"}
+    """
     def post(self, request, item_id):
-        """
-        Met à jour le statut d'un item de décaissement
-        Exemple de payload: {"statut": "valide"}
-        """
         try:
             item = DemandeDecaissementItem.objects.get(id=item_id)
         except DemandeDecaissementItem.DoesNotExist:
@@ -91,6 +67,5 @@ class DemandeDecaissementItemUpdateStatusView(APIView):
 
         item.statut = statut
         item.save()
-
-        # Le signal post_save s'occupera de créer la dépense si nécessaire
+        # Le signal post_save gérera la création de la dépense si nécessaire
         return Response(DemandeDecaissementItemSerializer(item).data)
