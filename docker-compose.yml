@@ -67,25 +67,7 @@ services:
       - ./rh_service/media:/app/media 
 
 
-    # ============================
-  # NGINX (Front Media)
-  # ============================
-  nginx:
-    image: nginx:alpine
-    container_name: nginx
-    restart: always
-    ports:
-      - "80:80"       # HTTP public
-      - "443:443"     # HTTPS public si SSL ajouté
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
-      - ./rh_service/media:/app/media  # monter le dossier media
-    depends_on:
-      - rh_service
-      - kong
-    networks:
-      - project_network
-
+  
 
   # ============================
   # STOCK SERVICE
