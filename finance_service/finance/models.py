@@ -2,6 +2,7 @@ from django.db import models
 import uuid
 from decimal import Decimal
 from django.core.validators import MinValueValidator
+from django.utils import timezone
 
 # =====================================
 # 💰 Demande de décaissement
@@ -29,13 +30,11 @@ class DemandeDecaissement(models.Model):
         return f"Décaissement {self.id} - Total: {self.total_montant}"
 
     def calculer_total(self):
-        """Calcul automatique du montant total à partir des items."""
         total = sum((item.montant for item in self.items.all()), Decimal('0.00'))
         self.total_montant = total
         self.save()
 
     def mettre_a_jour_statut(self):
-        """Mise à jour automatique du statut global selon les items."""
         items = self.items.all()
         statuts = set(item.statut for item in items)
         if statuts == {'valide'}:
@@ -72,7 +71,7 @@ class DemandeDecaissementItem(models.Model):
 
 
 # =====================================
-# 💵 Dépenses liées aux items
+# 💵 Dépenses liées aux items validés
 # =====================================
 class Depense(models.Model):
     STATUS_CHOICES = [
@@ -94,10 +93,21 @@ class Depense(models.Model):
 # =====================================
 # 🔔 Signaux pour mise à jour automatique
 # =====================================
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-@receiver([post_save, post_delete], sender=DemandeDecaissementItem)
-def update_decaissement_total(sender, instance, **kwargs):
-    instance.decaissement.calculer_total()
+@receiver(post_save, sender=DemandeDecaissementItem)
+def handle_item_validation(sender, instance, **kwargs):
+    """
+    Après mise à jour d'un item :
+    - Met à jour le statut global du décaissement
+    - Crée une dépense si l'item est valide et n'a pas encore de dépense
+    """
     instance.decaissement.mettre_a_jour_statut()
+
+    # Crée une dépense uniquement si l'item est valide et qu'aucune dépense n'existe
+    if instance.statut == 'valide' and not hasattr(instance, 'depense'):
+        Depense.objects.create(
+            item_decaissement=instance,
+            montant=instance.montant
+        )

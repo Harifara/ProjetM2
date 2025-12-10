@@ -1,12 +1,10 @@
 from django.db import models
 import uuid
 from django.utils import timezone
-import requests
-from django.conf import settings
 
 class ValidationCoordinateur(models.Model):
     STATUS_CHOICES = [
-        ('approuve', 'Approuvé'),
+        ('valide', 'Validé'),
         ('rejete', 'Rejeté'),
     ]
 
@@ -23,26 +21,9 @@ class ValidationCoordinateur(models.Model):
     def __str__(self):
         return f"Validation {self.item_decaissement_id} - {self.statut}"
 
-    def enregistrer_validation(self):
+    def enregistrer_local(self):
         """
-        Enregistre la validation côté coordinateur et notifie finance_service
-        pour mettre à jour le statut de l'item et recalculer le statut global.
+        Sauvegarde locale de la validation côté coordinateur.
+        L'envoi à Finance pour mise à jour de l'item doit se faire via view ou tâche asynchrone.
         """
-        # URL de l'API de finance_service pour mettre à jour un item décaissement
-        finance_api_url = f"{settings.FINANCE_SERVICE_URL}/api/decaissements/items/{self.item_decaissement_id}/validation/"
-
-        payload = {
-            "statut": "valide" if self.statut == "approuve" else "rejete",
-            "coordinateur_id": str(self.coordinateur_id),
-            "commentaire": self.commentaire,
-        }
-
-        try:
-            response = requests.post(finance_api_url, json=payload, timeout=5)
-            response.raise_for_status()
-        except requests.RequestException as e:
-            # Log l'erreur et laisse la validation enregistrée localement
-            print(f"Erreur lors de la mise à jour sur finance_service : {e}")
-
-        # Sauvegarde locale de la validation
         self.save()
