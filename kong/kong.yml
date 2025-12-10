@@ -85,7 +85,7 @@ services:
     url: http://rh_service:8000
     routes:
       - name: media-route
-        paths: ["/media/"]
+        paths: ["/media(/.*)?"]
         strip_path: false
         preserve_host: true
         protocols: ["http", "https"]
