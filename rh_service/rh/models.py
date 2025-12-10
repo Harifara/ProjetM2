@@ -519,7 +519,6 @@ class ModePayement(models.Model):
 # -------------------- TypeAchat --------------------
 class TypeAchat(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    type_achat = models.CharField(max_length=50, unique=True)
     nom = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)

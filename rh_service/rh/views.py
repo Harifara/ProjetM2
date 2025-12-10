@@ -266,7 +266,7 @@ class TypeAchatViewSet(viewsets.ModelViewSet):
     queryset = TypeAchat.objects.all()
     serializer_class = TypeAchatSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['type_achat', 'nom', 'description']
+    search_fields = ['nom', 'description']
     ordering_fields = ['nom', 'created_at']
 
     
