@@ -81,9 +81,6 @@ services:
           claims_to_verify: ["exp"]
 
   
-  # ---------------------------
-  # MEDIA SERVICE (images publiques)
-  # ---------------------------
   - name: media-service
     url: http://rh_service:8000
     routes:
@@ -94,7 +91,6 @@ services:
         protocols: ["http", "https"]
         hosts:
           - api.ecartmada.com
-    # Pas de plugin JWT ici, pour que les images soient publiques
     plugins:
       - name: cors
         config:
@@ -103,6 +99,7 @@ services:
           headers: ["Content-Type","Accept","Origin","X-Requested-With"]
           exposed_headers: []
           credentials: false
+
 
   # ---------------------------
   # STOCK SERVICE
