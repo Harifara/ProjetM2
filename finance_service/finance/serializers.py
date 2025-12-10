@@ -1,47 +1,37 @@
 from rest_framework import serializers
-from .models import DemandeDecaissement, DemandeDecaissementItem, Depense
+from .models import DemandeDecaissement, Depense
 
 # ----------------------------
-# Serializer pour les dépenses
+# Serializer pour les dépenses (items)
 # ----------------------------
 class DepenseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Depense
-        fields = ['id', 'item_decaissement', 'montant', 'date_creation', 'statut_paiement']
+        fields = ['id', 'description', 'montant', 'statut', 'date_creation']
         read_only_fields = ['id', 'date_creation']
 
 # ----------------------------
-# Serializer pour les items de décaissement
-# ----------------------------
-class DemandeDecaissementItemSerializer(serializers.ModelSerializer):
-    depense = DepenseSerializer(read_only=True)
-
-    class Meta:
-        model = DemandeDecaissementItem
-        fields = ['id', 'decaissement', 'description', 'montant', 'statut', 'depense']
-        read_only_fields = ['id', 'depense']
-
-# ----------------------------
-# Serializer pour les décaissements
+# Serializer pour les demandes de décaissement
 # ----------------------------
 class DemandeDecaissementSerializer(serializers.ModelSerializer):
-    items = DemandeDecaissementItemSerializer(many=True, read_only=True)
+    depenses = DepenseSerializer(many=True, read_only=True)
     total_items = serializers.SerializerMethodField()
+    statut = serializers.CharField(read_only=True)  # Propriété calculée
 
     class Meta:
         model = DemandeDecaissement
         fields = [
             'id',
-            'source_demande_rh_id',
-            'source_demande_stock_id',
+            'source_service',
             'date_creation',
-            'statut',
-            'total_montant',
-            'total_items',
             'created_by',
-            'items'
+            'total_montant',
+            'statut',
+            'envoyee',
+            'total_items',
+            'depenses'
         ]
-        read_only_fields = ['id', 'date_creation', 'statut', 'total_montant']
+        read_only_fields = ['id', 'date_creation', 'total_montant', 'statut']
 
     def get_total_items(self, obj):
-        return sum(item.montant for item in obj.items.all())
+        return sum(depense.montant for depense in obj.depenses.all())
