@@ -65,6 +65,7 @@ services:
       - project_network
     volumes:
       - ./rh_service/media:/app/media 
+      
 
 
   # ============================
