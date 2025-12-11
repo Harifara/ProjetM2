@@ -316,8 +316,9 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
             )
 
     def perform_create(self, serializer):
-        """Assignation automatique du demandeur"""
-        serializer.save(demandeur=self.request.user)
+        # Assignation correcte du demandeur_id
+        serializer.save(demandeur_id=self.request.user.id)
+
 
     def create(self, request, *args, **kwargs):
         """Créer une nouvelle demande d'achat"""
