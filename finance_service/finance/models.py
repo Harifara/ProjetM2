@@ -17,9 +17,15 @@ class DemandeDecaissement(models.Model):
         ('rejete', 'Rejetée'),
     ]
 
+    COORDO_DECISION_CHOICES = [
+        ('non_traite', 'Non traité'),
+        ('valide', 'Validé par coordo'),
+        ('rejete', 'Rejeté par coordo'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     source_service = models.CharField(max_length=50)  # 'RH' ou 'STOCK'
-    created_by = models.UUIDField()     # UUID du responsable finance
+    created_by = models.UUIDField()  # UUID du responsable finance
     date_creation = models.DateTimeField(auto_now_add=True)
 
     # Liens éventuels vers RH / STOCK
@@ -30,11 +36,6 @@ class DemandeDecaissement(models.Model):
     envoyee = models.BooleanField(default=False)
 
     # Décision du coordonnateur
-    COORDO_DECISION_CHOICES = [
-        ('non_traite', 'Non traité'),
-        ('valide', 'Validé par coordo'),
-        ('rejete', 'Rejeté par coordo'),
-    ]
     coordo_decision = models.CharField(max_length=20, choices=COORDO_DECISION_CHOICES, default='non_traite')
     coordo_id = models.UUIDField(null=True, blank=True)
     coordo_date = models.DateTimeField(null=True, blank=True)
@@ -60,15 +61,13 @@ class DemandeDecaissement(models.Model):
         if self.coordo_decision == 'non_traite':
             return 'en_attente'
 
-        # Si coordo a rejeté toute la demande
         if self.coordo_decision == 'rejete':
             return 'rejete'
 
-        # coordo_decision == 'valide' : déterminer selon dépenses
+        # Si coordo a validé, regarder les dépenses
         statuses = set(dep.statut for dep in self.depenses.all())
 
         if not statuses:
-            # validée par coordo mais pas encore transformée en dépenses
             return 'en_attente'
 
         if statuses == {'valide'}:
@@ -85,7 +84,6 @@ class DemandeDecaissement(models.Model):
     def calculer_total(self):
         """Recalculer total_montant depuis les dépenses existantes."""
         total = sum((dep.montant for dep in self.depenses.all()), Decimal('0.00'))
-        # Garder précision Decimal
         self.total_montant = total
         self.save(update_fields=['total_montant'])
 
@@ -120,18 +118,12 @@ class DepenseFinale(models.Model):
         return f"Finale {self.depense_id} - {self.montant}"
 
 
-# Signal amélioré : si une dépense passe à 'valide' et n'a pas encore de DepenseFinale => créer
+# Signal : créer automatiquement une DepenseFinale si dépense validée
 @receiver(post_save, sender=Depense)
 def create_depense_finale(sender, instance: Depense, created, **kwargs):
-    # Si dépense validée et pas encore de finale → créer
     if instance.statut == 'valide':
-        try:
-            _ = instance.depense_finale
-            # si existe, ne rien faire
-        except DepenseFinale.DoesNotExist:
+        if not hasattr(instance, 'depense_finale'):
             DepenseFinale.objects.create(depense=instance, montant=instance.montant)
 
-    # Recalculer total sur la demande
-    # (On le fait toujours pour rester cohérent)
     if instance.demande:
         instance.demande.calculer_total()
