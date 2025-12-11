@@ -28,7 +28,7 @@ class DepenseFinaleSerializer(serializers.ModelSerializer):
 
 class DemandeDecaissementSerializer(serializers.ModelSerializer):
     depenses = DepenseSerializer(many=True, read_only=True)
-    statut = serializers.CharField(source='statut', read_only=True)
+    statut = serializers.CharField(read_only=True)  # <-- retirer source='statut'
 
     class Meta:
         model = DemandeDecaissement
