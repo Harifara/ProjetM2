@@ -82,22 +82,20 @@ services:
 
   
   - name: media-service
-    url: http://rh_service:8000
+    url: http://media_nginx:80
     routes:
       - name: media-route
         paths: ["/media"]
         strip_path: false
         preserve_host: true
-        protocols: ["http", "https"]
         hosts:
           - api.ecartmada.com
     plugins:
       - name: cors
         config:
-          origins: ["https://ecartmada.com","https://www.ecartmada.com","http://localhost:5173","http://localhost:3000"]
+          origins: ["https://ecartmada.com","https://www.ecartmada.com"]
           methods: ["GET"]
           headers: ["Content-Type","Accept","Origin","X-Requested-With"]
-          exposed_headers: []
           credentials: false
 
 
