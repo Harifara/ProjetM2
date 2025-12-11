@@ -12,6 +12,18 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
     queryset = DemandeDecaissement.objects.all().order_by('-date_creation')
     serializer_class = DemandeDecaissementSerializer
 
+    # -----------------------------
+    # Créer un décaissement
+    # -----------------------------
+    def perform_create(self, serializer):
+        """
+        Remplit automatiquement 'created_by' avec l'utilisateur connecté.
+        """
+        serializer.save(created_by=self.request.user.id)
+
+    # -----------------------------
+    # Validation / rejet par coordo
+    # -----------------------------
     @action(detail=True, methods=['post'])
     def coordo_validation(self, request, pk=None):
         """
@@ -41,7 +53,6 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
 
         serializer = DemandeDecaissementSerializer(demande)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
 # -----------------------------
 # ViewSet pour Depense
 # -----------------------------
