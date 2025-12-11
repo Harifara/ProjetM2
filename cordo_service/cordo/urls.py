@@ -1,42 +1,12 @@
-from django.urls import path
-from .views import (
-    ValidationCoordinateurListView,
-    ValidationCoordinateurDetailView,
-    ValidationCoordinateurCreateView,
-    ValidationByDecaissementView,
-)
+# coordonateur/urls.py
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import ValidationCoordinateurViewSet, DemandesCoordoViewSet
+
+router = DefaultRouter()
+router.register(r'demandes', DemandesCoordoViewSet, basename='coordo-demande')
+router.register(r'validations', ValidationCoordinateurViewSet, basename='coordo-validation')
 
 urlpatterns = [
-
-    # ---------------------------
-    # Liste et création
-    # ---------------------------
-    path(
-        "validations/",
-        ValidationCoordinateurListView.as_view(),
-        name="validation-list"
-    ),
-    path(
-        "validations/create/",
-        ValidationCoordinateurCreateView.as_view(),
-        name="validation-create"
-    ),
-
-    # ---------------------------
-    # Détail d'une validation
-    # ---------------------------
-    path(
-        "validations/<uuid:id>/",
-        ValidationCoordinateurDetailView.as_view(),
-        name="validation-detail"
-    ),
-
-    # ---------------------------
-    # Lister les validations d'un décaissement
-    # ---------------------------
-    path(
-        "decaissements/<uuid:decaissement_id>/validations/",
-        ValidationByDecaissementView.as_view(),
-        name="validations-by-decaissement"
-    ),
+    path('', include(router.urls)),
 ]
