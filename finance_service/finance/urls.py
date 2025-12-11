@@ -1,14 +1,59 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import DemandeDecaissementViewSet, DepenseViewSet, DepenseFinaleViewSet
+# finance/urls.py
 
-# Créer le routeur DRF
-router = DefaultRouter()
-router.register(r'decaissements', DemandeDecaissementViewSet, basename='decaissement')
-router.register(r'depenses', DepenseViewSet, basename='depense')
-router.register(r'depenses-finales', DepenseFinaleViewSet, basename='depense_finale')
+from django.urls import path
+from .views import (
+    DemandeDecaissementListCreateView,
+    DemandeDecaissementDetailUpdateView,
+    DecaissementValidationView,
+    DecaissementRejetView,
+    DepenseListView,
+    DepenseByDecaissementView
+)
 
-# URL patterns
 urlpatterns = [
-    path('', include(router.urls)),
+
+    # --------------------
+    #  DÉCAISSEMENTS (Finance)
+    # --------------------
+    path(
+        "decaissements/",
+        DemandeDecaissementListCreateView.as_view(),
+        name="decaissement-list-create"
+    ),
+
+    path(
+        "decaissements/<uuid:id>/",
+        DemandeDecaissementDetailUpdateView.as_view(),
+        name="decaissement-detail-update"
+    ),
+
+    # --------------------
+    #  VALIDATION (Coordinateur)
+    # --------------------
+    path(
+        "decaissements/<uuid:id>/valider/",
+        DecaissementValidationView.as_view(),
+        name="decaissement-valider"
+    ),
+
+    path(
+        "decaissements/<uuid:id>/rejeter/",
+        DecaissementRejetView.as_view(),
+        name="decaissement-rejeter"
+    ),
+
+    # --------------------
+    #  DÉPENSES
+    # --------------------
+    path(
+        "depenses/",
+        DepenseListView.as_view(),
+        name="depense-list"
+    ),
+
+    path(
+        "decaissements/<uuid:id>/depenses/",
+        DepenseByDecaissementView.as_view(),
+        name="depense-by-decaissement"
+    ),
 ]

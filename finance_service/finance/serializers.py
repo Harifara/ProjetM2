@@ -1,51 +1,163 @@
 from rest_framework import serializers
-from .models import DemandeDecaissement, Depense, DepenseFinale
+from .models import DemandeDecaissement, Depense
+from rh.models import Demande as DemandeRH
+from stock.models import DemandeAchat
 
-# ----------------------------
-# Serializer pour les Dépenses
-# ----------------------------
+
+# -------------------------------------------------------------------
+# SERIALIZERS DES DEMANDES RH ET STOCK (lecture seule dans finance)
+# -------------------------------------------------------------------
+
+class DemandeRHSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DemandeRH
+        fields = ['id', 'description', 'status', 'montant_total', 'date_demande']
+
+
+class DemandeAchatSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DemandeAchat
+        fields = [
+            'id', 'numero', 'article', 'quantite',
+            'montant_estime', 'statut', 'statut_reception',
+            'created_at'
+        ]
+
+
+# -------------------------------------------------------------------
+# DEPENSE (générée automatiquement)
+# -------------------------------------------------------------------
+
 class DepenseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Depense
-        fields = ['id', 'description', 'montant', 'statut', 'date_creation']
-        read_only_fields = ['id', 'date_creation']
+        fields = [
+            'id',
+            'decaissement',
+            'montant',
+            'date_paiement',
+            'description',
+            'created_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'date_paiement']
 
 
-# ----------------------------
-# Serializer pour les Dépenses Finales
-# ----------------------------
-class DepenseFinaleSerializer(serializers.ModelSerializer):
-    depense = DepenseSerializer(read_only=True)
+# -------------------------------------------------------------------
+# DEMANDE DE DÉCAISSEMENT — LISTE
+# -------------------------------------------------------------------
 
-    class Meta:
-        model = DepenseFinale
-        fields = ['id', 'depense', 'montant', 'date_creation', 'paye']
-        read_only_fields = ['id', 'depense', 'date_creation']
-
-
-# ----------------------------
-# Serializer pour les Demandes de Décaissement
-# ----------------------------
-class DemandeDecaissementSerializer(serializers.ModelSerializer):
-    depenses = DepenseSerializer(many=True, read_only=True)
-    total_items = serializers.SerializerMethodField()
-    statut = serializers.CharField(read_only=True)
+class DemandeDecaissementListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DemandeDecaissement
         fields = [
             'id',
-            'source_service',
-            'created_by',
-            'date_creation',
-            'envoyee',
-            'total_montant',
+            'numero',
+            'montant_total',
             'statut',
-            'total_items',
-            'depenses'
+            'finance_createur_id',
+            'coordinateur_valideur_id',
+            'date_decision',
+            'created_at'
         ]
-        read_only_fields = ['id', 'date_creation', 'total_montant', 'statut', 'total_items']
 
-    def get_total_items(self, obj):
-        """Retourne le montant total de toutes les dépenses liées."""
-        return sum(dep.montant for dep in obj.depenses.all())
+
+# -------------------------------------------------------------------
+# DEMANDE DE DÉCAISSEMENT — DÉTAIL COMPLET
+# -------------------------------------------------------------------
+
+class DemandeDecaissementDetailSerializer(serializers.ModelSerializer):
+    demandes_rh = DemandeRHSerializer(many=True, read_only=True)
+    demandes_stock = DemandeAchatSerializer(many=True, read_only=True)
+    depenses = DepenseSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = DemandeDecaissement
+        fields = [
+            'id',
+            'numero',
+            'demandes_rh',
+            'demandes_stock',
+            'montant_total',
+            'statut',
+            'finance_createur_id',
+            'coordinateur_valideur_id',
+            'date_decision',
+            'commentaire',
+            'depenses',
+            'created_at',
+            'updated_at'
+        ]
+
+
+# -------------------------------------------------------------------
+# DEMANDE DE DÉCAISSEMENT — CRÉATION / UPDATE
+# -------------------------------------------------------------------
+
+class DemandeDecaissementCreateSerializer(serializers.ModelSerializer):
+
+    # Le finance peut envoyer des IDs de demandes RH et Stock
+    demandes_rh_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False
+    )
+
+    demandes_stock_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False
+    )
+
+    class Meta:
+        model = DemandeDecaissement
+        fields = [
+            'id',
+            'numero',
+            'finance_createur_id',
+            'demandes_rh_ids',
+            'demandes_stock_ids'
+        ]
+
+    def create(self, validated_data):
+
+        rh_ids = validated_data.pop('demandes_rh_ids', [])
+        stock_ids = validated_data.pop('demandes_stock_ids', [])
+
+        decaissement = DemandeDecaissement.objects.create(**validated_data)
+
+        # Attach RH
+        if rh_ids:
+            demandes_rh = DemandeRH.objects.filter(id__in=rh_ids)
+            decaissement.demandes_rh.set(demandes_rh)
+
+        # Attach Stock
+        if stock_ids:
+            demandes_stock = DemandeAchat.objects.filter(id__in=stock_ids)
+            decaissement.demandes_stock.set(demandes_stock)
+
+        # recalculer total
+        decaissement.recalculer_total()
+
+        return decaissement
+
+    def update(self, instance, validated_data):
+        rh_ids = validated_data.pop('demandes_rh_ids', None)
+        stock_ids = validated_data.pop('demandes_stock_ids', None)
+
+        instance.numero = validated_data.get('numero', instance.numero)
+        instance.finance_createur_id = validated_data.get('finance_createur_id', instance.finance_createur_id)
+        instance.save()
+
+        # Update RH
+        if rh_ids is not None:
+            demandes_rh = DemandeRH.objects.filter(id__in=rh_ids)
+            instance.demandes_rh.set(demandes_rh)
+
+        # Update Stock
+        if stock_ids is not None:
+            demandes_stock = DemandeAchat.objects.filter(id__in=stock_ids)
+            instance.demandes_stock.set(demandes_stock)
+
+        # Recalcul total
+        instance.recalculer_total()
+
+        return instance

@@ -1,85 +1,125 @@
-import uuid
-from decimal import Decimal
-from django.db import models
-from django.core.validators import MinValueValidator
-from django.db.models.signals import post_save
-from django.dispatch import receiver
+# finance/models.py
 
-# =====================================
-# Demande de Décaissement (Finance → Coordo)
-# =====================================
+import uuid
+from django.db import models
+from django.utils import timezone
+from django.core.exceptions import ValidationError
+
+from rh.models import Demande as DemandeRH
+from stock.models import DemandeAchat
+
+
+# ======================================================
+# 1) Demande de Décaissement
+# ======================================================
 class DemandeDecaissement(models.Model):
-    STATUS_CHOICES = [
-        ('non_envoyee', 'Non envoyée'),
-        ('en_attente', 'Envoyée au Coordonnateur'),
-        ('partiellement_valide', 'Partiellement validée'),
-        ('valide', 'Validée'),
-        ('rejete', 'Rejetée'),
+
+    STATUT_CHOICES = [
+        ('en_attente', 'En attente de validation coordinateur'),
+        ('valide', 'Validé par le coordinateur'),
+        ('rejete', 'Rejeté par le coordinateur'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    source_service = models.CharField(max_length=50)  # RH ou Stock
-    created_by = models.UUIDField()  # UUID du responsable finance
-    date_creation = models.DateTimeField(auto_now_add=True)
-    envoyee = models.BooleanField(default=False)  # Envoyée au Coordonnateur
-    total_montant = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    numero = models.CharField(max_length=100, unique=True)
 
-    @property
-    def statut(self):
-        if not self.envoyee:
-            return 'non_envoyee'
-        dep_status = set(dep.statut for dep in self.depenses.all())
-        if not dep_status:
-            return 'en_attente'
-        elif dep_status == {'valide'}:
-            return 'valide'
-        elif 'valide' in dep_status:
-            return 'partiellement_valide'
-        elif dep_status == {'rejete'}:
-            return 'rejete'
-        else:
-            return 'en_attente'
+    # Regroupement des demandes RH
+    demandes_rh = models.ManyToManyField(
+        DemandeRH, related_name='decaissements', blank=True
+    )
 
-    def calculer_total(self):
-        self.total_montant = sum(dep.montant for dep in self.depenses.all())
+    # Regroupement des demandes Stock
+    demandes_stock = models.ManyToManyField(
+        DemandeAchat, related_name='decaissements', blank=True
+    )
+
+    montant_total = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+
+    statut = models.CharField(
+        max_length=20, choices=STATUT_CHOICES, default='en_attente'
+    )
+
+    # Créateur (Finance)
+    finance_createur_id = models.UUIDField(help_text="UUID du responsable finance")
+
+    # Decision du coordinateur
+    coordinateur_valideur_id = models.UUIDField(null=True, blank=True)
+    date_decision = models.DateTimeField(null=True, blank=True)
+    commentaire = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'finance_decaissement'
+        ordering = ['-created_at']
+        verbose_name = "Demande de Décaissement"
+        verbose_name_plural = "Demandes de Décaissement"
+
+    # ---------------------------------
+    # Calcul du montant total
+    # ---------------------------------
+    def recalculer_total(self):
+        total_rh = sum(d.montant_total() for d in self.demandes_rh.all())
+        total_stock = sum(d.montant_estime for d in self.demandes_stock.all())
+        self.montant_total = total_rh + total_stock
+        self.save()
+        return self.montant_total
+
+    # ---------------------------------
+    # Validation par le coordinateur
+    # ---------------------------------
+    def valider_par_coordonateur(self, coordo_id: uuid.UUID):
+        if self.statut != 'en_attente':
+            raise ValidationError("Décision déjà enregistrée.")
+
+        self.statut = 'valide'
+        self.coordinateur_valideur_id = coordo_id
+        self.date_decision = timezone.now()
         self.save()
 
+        # Création automatique d'une dépense
+        Depense.objects.create(
+            decaissement=self,
+            montant=self.montant_total,
+            description=f"Dépense générée automatiquement pour {self.numero}"
+        )
 
-# =====================================
-# Dépense (Article ou paiement lié à la demande)
-# =====================================
+    def rejeter_par_coordonateur(self, coordo_id: uuid.UUID, commentaire: str = ''):
+        if self.statut != 'en_attente':
+            raise ValidationError("Décision déjà enregistrée.")
+
+        self.statut = 'rejete'
+        self.coordinateur_valideur_id = coordo_id
+        self.commentaire = commentaire
+        self.date_decision = timezone.now()
+        self.save()
+
+    def __str__(self):
+        return f"{self.numero} | Statut: {self.statut}"
+
+
+# ======================================================
+# 2) Dépenses générées après validation
+# ======================================================
 class Depense(models.Model):
-    STATUT_CHOICES = [
-        ('en_attente', 'En attente'),
-        ('valide', 'Validé par Coordonnateur'),
-        ('rejete', 'Rejeté par Coordonnateur'),
-        ('paye', 'Payé'),
-    ]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    demande = models.ForeignKey(DemandeDecaissement, on_delete=models.CASCADE, related_name='depenses')
-    description = models.TextField()
-    montant = models.DecimalField(max_digits=15, decimal_places=2, validators=[MinValueValidator(0.01)])
-    statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='en_attente')
-    date_creation = models.DateTimeField(auto_now_add=True)
 
+    decaissement = models.ForeignKey(
+        DemandeDecaissement,
+        on_delete=models.CASCADE,
+        related_name='depenses'
+    )
 
-# =====================================
-# Dépense Finale (Créée automatiquement après validation Coordo)
-# =====================================
-class DepenseFinale(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    depense = models.OneToOneField(Depense, on_delete=models.CASCADE, related_name='depense_finale')
     montant = models.DecimalField(max_digits=15, decimal_places=2)
-    date_creation = models.DateTimeField(auto_now_add=True)
-    paye = models.BooleanField(default=False)
+    date_paiement = models.DateTimeField(default=timezone.now)
+    description = models.TextField(blank=True)
 
+    created_at = models.DateTimeField(auto_now_add=True)
 
-# =====================================
-# Signal : créer une dépense finale dès qu'une dépense est validée
-# =====================================
-@receiver(post_save, sender=Depense)
-def create_depense_finale(sender, instance, **kwargs):
-    if instance.statut == 'valide' and not hasattr(instance, 'depense_finale'):
-        DepenseFinale.objects.create(depense=instance, montant=instance.montant)
-        if instance.demande:
-            instance.demande.calculer_total()
+    class Meta:
+        db_table = "finance_depenses"
+        ordering = ['-date_paiement']
+
+    def __str__(self):
+        return f"Dépense {self.montant} Ar | DC {self.decaissement.numero}"

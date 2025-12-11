@@ -1,17 +1,33 @@
 from rest_framework import serializers
 from .models import ValidationCoordinateur
+from finance.serializers import DemandeDecaissementListSerializer
 
 class ValidationCoordinateurSerializer(serializers.ModelSerializer):
+    # Nested serializer pour afficher le décaissement associé
+    decaissement_detail = DemandeDecaissementListSerializer(
+        source='decaissement', read_only=True
+    )
+
     class Meta:
         model = ValidationCoordinateur
-        # Tous les champs nécessaires
         fields = [
             'id',
-            'item_decaissement_id',  # UUID de l'item dans finance_service
-            'coordinateur_id',       # UUID de l'utilisateur coordinateur
-            'statut',                # 'valide' ou 'rejete'
-            'commentaire',           # optionnel
-            'date_validation',       # date automatique
+            'decaissement',
+            'decaissement_detail',
+            'decision',
+            'commentaire',
+            'coordinateur_id',
+            'date_decision',
         ]
-        # Champs générés automatiquement ou non modifiables côté client
-        read_only_fields = ['id', 'date_validation']
+        read_only_fields = ['id', 'date_decision', 'decaissement_detail']
+
+# Serializer pour la création simple (POST)
+class ValidationCoordinateurCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ValidationCoordinateur
+        fields = [
+            'decaissement',
+            'decision',
+            'commentaire',
+            'coordinateur_id',
+        ]
