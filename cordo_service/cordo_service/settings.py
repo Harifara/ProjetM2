@@ -11,6 +11,7 @@ DEBUG = config("DEBUG", default=True, cast=bool)
 ALLOWED_HOSTS = config("DJANGO_ALLOWED_HOSTS", default="localhost").split(",")
 
 INSTALLED_APPS = [
+    "finance",
     "cordo",
     "django.contrib.admin",
     "django.contrib.auth",
