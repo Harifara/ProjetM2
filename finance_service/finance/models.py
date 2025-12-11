@@ -42,7 +42,7 @@ class DemandeDecaissement(models.Model):
     # Créateur (Finance)
     finance_createur_id = models.UUIDField(help_text="UUID du responsable finance")
 
-    # Decision du coordinateur
+    # Décision du coordinateur
     coordinateur_valideur_id = models.UUIDField(null=True, blank=True)
     date_decision = models.DateTimeField(null=True, blank=True)
     commentaire = models.TextField(blank=True)
@@ -60,23 +60,23 @@ class DemandeDecaissement(models.Model):
     # Calcul du montant total
     # ---------------------------------
     def recalculer_total(self):
-        total_rh = sum(d.montant_total() for d in self.demandes_rh.all())
-        total_stock = sum(d.montant_estime for d in self.demandes_stock.all())
+        total_rh = sum(d.montant_total() or 0 for d in self.demandes_rh.all())
+        total_stock = sum(d.montant_estime or 0 for d in self.demandes_stock.all())
         self.montant_total = total_rh + total_stock
-        self.save()
+        self.save(update_fields=['montant_total'])
         return self.montant_total
 
     # ---------------------------------
     # Validation par le coordinateur
     # ---------------------------------
-    def valider_par_coordonateur(self, coordo_id: uuid.UUID):
+    def valider_par_coordinateur(self, coordo_id: uuid.UUID):
         if self.statut != 'en_attente':
             raise ValidationError("Décision déjà enregistrée.")
 
         self.statut = 'valide'
         self.coordinateur_valideur_id = coordo_id
         self.date_decision = timezone.now()
-        self.save()
+        self.save(update_fields=['statut', 'coordinateur_valideur_id', 'date_decision'])
 
         # Création automatique d'une dépense
         Depense.objects.create(
@@ -85,7 +85,7 @@ class DemandeDecaissement(models.Model):
             description=f"Dépense générée automatiquement pour {self.numero}"
         )
 
-    def rejeter_par_coordonateur(self, coordo_id: uuid.UUID, commentaire: str = ''):
+    def rejeter_par_coordinateur(self, coordo_id: uuid.UUID, commentaire: str = ''):
         if self.statut != 'en_attente':
             raise ValidationError("Décision déjà enregistrée.")
 
@@ -93,7 +93,7 @@ class DemandeDecaissement(models.Model):
         self.coordinateur_valideur_id = coordo_id
         self.commentaire = commentaire
         self.date_decision = timezone.now()
-        self.save()
+        self.save(update_fields=['statut', 'coordinateur_valideur_id', 'commentaire', 'date_decision'])
 
     def __str__(self):
         return f"{self.numero} | Statut: {self.statut}"

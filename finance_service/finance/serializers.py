@@ -7,11 +7,11 @@ from stock.models import DemandeAchat
 # -------------------------------------------------------------------
 # SERIALIZERS DES DEMANDES RH ET STOCK (lecture seule dans finance)
 # -------------------------------------------------------------------
-
 class DemandeRHSerializer(serializers.ModelSerializer):
     class Meta:
         model = DemandeRH
         fields = ['id', 'description', 'status', 'montant_total', 'date_demande']
+        read_only_fields = fields
 
 
 class DemandeAchatSerializer(serializers.ModelSerializer):
@@ -22,12 +22,12 @@ class DemandeAchatSerializer(serializers.ModelSerializer):
             'montant_estime', 'statut', 'statut_reception',
             'created_at'
         ]
+        read_only_fields = fields
 
 
 # -------------------------------------------------------------------
 # DEPENSE (générée automatiquement)
 # -------------------------------------------------------------------
-
 class DepenseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Depense
@@ -45,9 +45,7 @@ class DepenseSerializer(serializers.ModelSerializer):
 # -------------------------------------------------------------------
 # DEMANDE DE DÉCAISSEMENT — LISTE
 # -------------------------------------------------------------------
-
 class DemandeDecaissementListSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = DemandeDecaissement
         fields = [
@@ -60,12 +58,12 @@ class DemandeDecaissementListSerializer(serializers.ModelSerializer):
             'date_decision',
             'created_at'
         ]
+        read_only_fields = fields
 
 
 # -------------------------------------------------------------------
 # DEMANDE DE DÉCAISSEMENT — DÉTAIL COMPLET
 # -------------------------------------------------------------------
-
 class DemandeDecaissementDetailSerializer(serializers.ModelSerializer):
     demandes_rh = DemandeRHSerializer(many=True, read_only=True)
     demandes_stock = DemandeAchatSerializer(many=True, read_only=True)
@@ -88,23 +86,25 @@ class DemandeDecaissementDetailSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at'
         ]
+        read_only_fields = [
+            'id', 'montant_total', 'statut', 'coordinateur_valideur_id',
+            'date_decision', 'depenses', 'created_at', 'updated_at'
+        ]
 
 
 # -------------------------------------------------------------------
 # DEMANDE DE DÉCAISSEMENT — CRÉATION / UPDATE
 # -------------------------------------------------------------------
-
 class DemandeDecaissementCreateSerializer(serializers.ModelSerializer):
-
-    # Le finance peut envoyer des IDs de demandes RH et Stock
     demandes_rh_ids = serializers.ListField(
         child=serializers.UUIDField(),
-        required=False
+        required=False,
+        write_only=True
     )
-
     demandes_stock_ids = serializers.ListField(
         child=serializers.UUIDField(),
-        required=False
+        required=False,
+        write_only=True
     )
 
     class Meta:
@@ -116,9 +116,9 @@ class DemandeDecaissementCreateSerializer(serializers.ModelSerializer):
             'demandes_rh_ids',
             'demandes_stock_ids'
         ]
+        read_only_fields = ['id']
 
     def create(self, validated_data):
-
         rh_ids = validated_data.pop('demandes_rh_ids', [])
         stock_ids = validated_data.pop('demandes_stock_ids', [])
 
@@ -134,9 +134,8 @@ class DemandeDecaissementCreateSerializer(serializers.ModelSerializer):
             demandes_stock = DemandeAchat.objects.filter(id__in=stock_ids)
             decaissement.demandes_stock.set(demandes_stock)
 
-        # recalculer total
+        # Recalculer total
         decaissement.recalculer_total()
-
         return decaissement
 
     def update(self, instance, validated_data):
@@ -145,7 +144,7 @@ class DemandeDecaissementCreateSerializer(serializers.ModelSerializer):
 
         instance.numero = validated_data.get('numero', instance.numero)
         instance.finance_createur_id = validated_data.get('finance_createur_id', instance.finance_createur_id)
-        instance.save()
+        instance.save(update_fields=['numero', 'finance_createur_id'])
 
         # Update RH
         if rh_ids is not None:
@@ -157,7 +156,6 @@ class DemandeDecaissementCreateSerializer(serializers.ModelSerializer):
             demandes_stock = DemandeAchat.objects.filter(id__in=stock_ids)
             instance.demandes_stock.set(demandes_stock)
 
-        # Recalcul total
+        # Recalculer total
         instance.recalculer_total()
-
         return instance
