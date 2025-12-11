@@ -1,13 +1,13 @@
+# finance/models.py
 import uuid
 from decimal import Decimal
 from django.db import models
 from django.core.validators import MinValueValidator
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
-# =====================================
-# Demande de Décaissement (Finance → Coordo)
-# =====================================
+
 class DemandeDecaissement(models.Model):
     STATUS_CHOICES = [
         ('non_envoyee', 'Non envoyée'),
@@ -18,43 +18,86 @@ class DemandeDecaissement(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    source_service = models.CharField(max_length=50)  # RH ou Stock
-    created_by = models.UUIDField()  # UUID du responsable finance
+    source_service = models.CharField(max_length=50)  # 'RH' ou 'STOCK'
+    created_by = models.UUIDField()     # UUID du responsable finance
     date_creation = models.DateTimeField(auto_now_add=True)
-    envoyee = models.BooleanField(default=False)  # Envoyée au Coordonnateur
-    total_montant = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+
+    # Liens éventuels vers RH / STOCK
+    demande_id = models.UUIDField(null=True, blank=True)
+    demandeAchat_id = models.UUIDField(null=True, blank=True)
+
+    # Envoi au coordo
+    envoyee = models.BooleanField(default=False)
+
+    # Décision du coordonnateur
+    COORDO_DECISION_CHOICES = [
+        ('non_traite', 'Non traité'),
+        ('valide', 'Validé par coordo'),
+        ('rejete', 'Rejeté par coordo'),
+    ]
+    coordo_decision = models.CharField(max_length=20, choices=COORDO_DECISION_CHOICES, default='non_traite')
+    coordo_id = models.UUIDField(null=True, blank=True)
+    coordo_date = models.DateTimeField(null=True, blank=True)
+    coordo_commentaire = models.TextField(blank=True)
+
+    total_montant = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
+
+    def __str__(self):
+        label = "RH" if self.demande_id else ("STOCK" if self.demandeAchat_id else "GEN")
+        return f"Décaissement ({label}) - {self.id}"
 
     @property
     def statut(self):
+        """
+        Statut calculé :
+        - non_envoyee : pas encore envoyé au coordo
+        - en_attente : envoyé mais non traité par coordo
+        - valide / partiellement_valide / rejete : selon décisions et dépenses
+        """
         if not self.envoyee:
             return 'non_envoyee'
-        dep_status = set(dep.statut for dep in self.depenses.all())
-        if not dep_status:
+
+        if self.coordo_decision == 'non_traite':
             return 'en_attente'
-        elif dep_status == {'valide'}:
-            return 'valide'
-        elif 'valide' in dep_status:
-            return 'partiellement_valide'
-        elif dep_status == {'rejete'}:
+
+        # Si coordo a rejeté toute la demande
+        if self.coordo_decision == 'rejete':
             return 'rejete'
-        else:
+
+        # coordo_decision == 'valide' : déterminer selon dépenses
+        statuses = set(dep.statut for dep in self.depenses.all())
+
+        if not statuses:
+            # validée par coordo mais pas encore transformée en dépenses
             return 'en_attente'
+
+        if statuses == {'valide'}:
+            return 'valide'
+
+        if 'valide' in statuses:
+            return 'partiellement_valide'
+
+        if statuses == {'rejete'}:
+            return 'rejete'
+
+        return 'en_attente'
 
     def calculer_total(self):
-        self.total_montant = sum(dep.montant for dep in self.depenses.all())
-        self.save()
+        """Recalculer total_montant depuis les dépenses existantes."""
+        total = sum((dep.montant for dep in self.depenses.all()), Decimal('0.00'))
+        # Garder précision Decimal
+        self.total_montant = total
+        self.save(update_fields=['total_montant'])
 
 
-# =====================================
-# Dépense (Article ou paiement lié à la demande)
-# =====================================
 class Depense(models.Model):
     STATUT_CHOICES = [
         ('en_attente', 'En attente'),
-        ('valide', 'Validé par Coordonnateur'),
-        ('rejete', 'Rejeté par Coordonnateur'),
+        ('valide', 'Validé'),
+        ('rejete', 'Rejeté'),
         ('paye', 'Payé'),
     ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     demande = models.ForeignKey(DemandeDecaissement, on_delete=models.CASCADE, related_name='depenses')
     description = models.TextField()
@@ -62,10 +105,10 @@ class Depense(models.Model):
     statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='en_attente')
     date_creation = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return f"{self.description} ({self.montant})"
 
-# =====================================
-# Dépense Finale (Créée automatiquement après validation Coordo)
-# =====================================
+
 class DepenseFinale(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     depense = models.OneToOneField(Depense, on_delete=models.CASCADE, related_name='depense_finale')
@@ -73,13 +116,22 @@ class DepenseFinale(models.Model):
     date_creation = models.DateTimeField(auto_now_add=True)
     paye = models.BooleanField(default=False)
 
+    def __str__(self):
+        return f"Finale {self.depense_id} - {self.montant}"
 
-# =====================================
-# Signal : créer une dépense finale dès qu'une dépense est validée
-# =====================================
+
+# Signal amélioré : si une dépense passe à 'valide' et n'a pas encore de DepenseFinale => créer
 @receiver(post_save, sender=Depense)
-def create_depense_finale(sender, instance, **kwargs):
-    if instance.statut == 'valide' and not hasattr(instance, 'depense_finale'):
-        DepenseFinale.objects.create(depense=instance, montant=instance.montant)
-        if instance.demande:
-            instance.demande.calculer_total()
+def create_depense_finale(sender, instance: Depense, created, **kwargs):
+    # Si dépense validée et pas encore de finale → créer
+    if instance.statut == 'valide':
+        try:
+            _ = instance.depense_finale
+            # si existe, ne rien faire
+        except DepenseFinale.DoesNotExist:
+            DepenseFinale.objects.create(depense=instance, montant=instance.montant)
+
+    # Recalculer total sur la demande
+    # (On le fait toujours pour rester cohérent)
+    if instance.demande:
+        instance.demande.calculer_total()

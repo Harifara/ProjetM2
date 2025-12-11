@@ -1,14 +1,25 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import DemandeDecaissementViewSet, DepenseViewSet, DepenseFinaleViewSet
+# finance/urls.py
+from django.urls import path
+from .views import (
+    DemandeDecaissementListCreateView,
+    DemandeDecaissementDetailUpdateView,
+    DemandeEnvoyerCoordoView,
+    DemandeValiderCoordoView,
+    DemandeRejeterCoordoView,
+    DepenseCreateView,
+    DepenseValidationView,
+    DepenseRejetView,
+)
 
-# Créer le routeur DRF
-router = DefaultRouter()
-router.register(r'decaissements', DemandeDecaissementViewSet, basename='decaissement')
-router.register(r'depenses', DepenseViewSet, basename='depense')
-router.register(r'depenses-finales', DepenseFinaleViewSet, basename='depense_finale')
-
-# URL patterns
 urlpatterns = [
-    path('', include(router.urls)),
+    path("decaissements/", DemandeDecaissementListCreateView.as_view(), name="decaissement-list-create"),
+    path("decaissements/<uuid:id>/", DemandeDecaissementDetailUpdateView.as_view(), name="decaissement-detail-update"),
+    path("decaissements/<uuid:id>/envoyer/", DemandeEnvoyerCoordoView.as_view(), name="decaissement-envoyer-coordo"),
+    path("decaissements/<uuid:id>/valider-coordo/", DemandeValiderCoordoView.as_view(), name="decaissement-valider-coordo"),
+    path("decaissements/<uuid:id>/rejeter-coordo/", DemandeRejeterCoordoView.as_view(), name="decaissement-rejeter-coordo"),
+
+    # Depenses
+    path("depenses/", DepenseCreateView.as_view(), name="depense-create"),
+    path("depenses/<uuid:depense_id>/valider/", DepenseValidationView.as_view(), name="depense-valider"),
+    path("depenses/<uuid:depense_id>/rejeter/", DepenseRejetView.as_view(), name="depense-rejeter"),
 ]
