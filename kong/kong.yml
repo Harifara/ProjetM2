@@ -86,7 +86,7 @@ services:
     routes:
       - name: media-route
         paths: ["/media(/.*)?"]
-        strip_path: true
+        strip_path: false
         preserve_host: true
         protocols: ["http", "https"]
         hosts:
