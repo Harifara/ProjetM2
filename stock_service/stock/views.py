@@ -315,18 +315,13 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-    def perform_create(self, serializer):
-        # Assignation correcte du demandeur_id
-        serializer.save(demandeur_id=self.request.user.id)
-
-
     def create(self, request, *args, **kwargs):
         """Créer une nouvelle demande d'achat"""
         try:
             serializer = self.get_serializer(data=request.data, context={'request': request})
             serializer.is_valid(raise_exception=True)
-            # assignation correcte de demandeur_id
-            serializer.save(demandeur_id=request.user.id)
+            # Le serializer utilise context['request'] pour assigner demandeur_id et générer le numéro
+            serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except ValidationError as ve:
             return Response({"error": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
@@ -336,7 +331,6 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
                 {"error": "Erreur lors de la création de la demande d'achat", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
 
     @action(detail=True, methods=['post'], permission_classes=[IsResponsableStock])
     def valider_finance(self, request, pk=None):
