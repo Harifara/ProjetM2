@@ -96,10 +96,7 @@ class Employer(models.Model):
         ('master', 'Master'),
     ]
     
-    SEXE_CHOICES = [
-        ('M', 'Masculin'),
-        ('F', 'Féminin'),
-    ]
+    SEXE_CHOICES = [("M", "Masculin"), ("F", "Féminin")]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     nom_employer = models.CharField(max_length=100)
