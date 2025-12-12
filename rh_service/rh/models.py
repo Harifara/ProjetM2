@@ -95,12 +95,17 @@ class Employer(models.Model):
         ('licence', 'Licence'),
         ('master', 'Master'),
     ]
+    
+    SEXE_CHOICES = [
+        ('M', 'Masculin'),
+        ('F', 'Féminin'),
+    ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     nom_employer = models.CharField(max_length=100)
     prenom_employer = models.CharField(max_length=100)
     date_naissance = models.DateField(null=True, blank=True)
-
+    sexe = models.CharField(max_length=1, choices=SEXE_CHOICES, null=True, blank=True)
     status_employer = models.CharField(max_length=20, choices=STATUS_CHOICES, default='actif')
     date_entree = models.DateField()
 
