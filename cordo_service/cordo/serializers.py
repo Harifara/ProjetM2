@@ -1,4 +1,3 @@
-# coordonnateur/serializers.py
 from rest_framework import serializers
 from .models import ValidationCoordonnateur
 
@@ -27,12 +26,7 @@ class ValidationCoordonnateurCreateSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
-        if ValidationCoordonnateur.objects.filter(
-            demande_decaissement_id=attrs['demande_decaissement_id']
-        ).exists():
-            raise serializers.ValidationError(
-                "Cette demande de décaissement a déjà été traitée."
-            )
+        # Vérifie uniquement la décision
         if attrs.get('decision') not in ['approuve', 'rejete']:
             raise serializers.ValidationError("Décision invalide.")
         return attrs
@@ -40,4 +34,14 @@ class ValidationCoordonnateurCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         request = self.context['request']
         validated_data['coordonnateur_id'] = request.user.id
-        return super().create(validated_data)
+
+        # Utilisation de update_or_create pour éviter les erreurs 400 si déjà existant
+        obj, created = ValidationCoordonnateur.objects.update_or_create(
+            demande_decaissement_id=validated_data['demande_decaissement_id'],
+            defaults={
+                'coordonnateur_id': validated_data['coordonnateur_id'],
+                'decision': validated_data['decision'],
+                'commentaire': validated_data.get('commentaire', ''),
+            }
+        )
+        return obj

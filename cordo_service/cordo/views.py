@@ -1,4 +1,3 @@
-# coordonnateur/views.py
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -26,7 +25,17 @@ class ValidationCoordonnateurViewSet(viewsets.ModelViewSet):
             context={'request': request}
         )
         serializer.is_valid(raise_exception=True)
-        validation = serializer.save()
+        data = serializer.validated_data
+
+        # Utilisation de update_or_create pour éviter l'erreur 400 si déjà validé
+        validation, created = ValidationCoordonnateur.objects.update_or_create(
+            demande_decaissement_id=data['demande_decaissement_id'],
+            defaults={
+                'coordonnateur_id': request.user.id,
+                'decision': data['decision'],
+                'commentaire': data.get('commentaire', ''),
+            }
+        )
 
         # Appel service Finance
         finance_status = "non testé"
