@@ -1,8 +1,7 @@
-# finance/models.py
 import uuid
-from django.db import models
-from django.utils import timezone
 from decimal import Decimal
+from django.db import models, transaction
+from django.utils import timezone
 from django.core.exceptions import ValidationError
 
 
@@ -30,14 +29,23 @@ class DemandeDecaissement(models.Model):
 
     def __str__(self):
         return f"Décaissement {self.reference or self.id} | {self.statut}"
-    
+
     def save(self, *args, **kwargs):
         if not self.reference:
             now = self.date_creation or timezone.now()
-            last = DemandeDecaissement.objects.filter(date_creation__date=now.date()).count() + 1
-            self.reference = f"DEC-{now:%Y%m%d}-{last:03d}"
+            # Génération atomique de la référence pour éviter les doublons
+            with transaction.atomic():
+                last_count = DemandeDecaissement.objects.filter(date_creation__date=now.date()).count() + 1
+                self.reference = f"DEC-{now:%Y%m%d}-{last_count:03d}"
+                # Vérification rare de collision
+                while DemandeDecaissement.objects.filter(reference=self.reference).exists():
+                    last_count += 1
+                    self.reference = f"DEC-{now:%Y%m%d}-{last_count:03d}"
         super().save(*args, **kwargs)
 
+    # ------------------------
+    # Méthodes métier
+    # ------------------------
     def calculer_montant_total(self, montant_rh=0, montant_stock=0):
         self.montant_total = Decimal(montant_rh) + Decimal(montant_stock)
         self.save()
