@@ -39,6 +39,7 @@ class DemandeDecaissementListSerializer(serializers.ModelSerializer):
         model = DemandeDecaissement
         fields = [
             'id',
+            'reference', 
             'montant_total',
             'statut',
             'date_creation',
@@ -53,6 +54,7 @@ class DemandeDecaissementDetailSerializer(serializers.ModelSerializer):
         model = DemandeDecaissement
         fields = [
             'id',
+            'reference',
             'demandes_rh_ids',
             'demandes_stock_ids',
             'montant_total',
@@ -69,6 +71,7 @@ class DemandeDecaissementCreateSerializer(serializers.ModelSerializer):
         model = DemandeDecaissement
         fields = [
             'id',
+            'reference', 
             'demandes_rh_ids',
             'demandes_stock_ids',
             'montant_total',

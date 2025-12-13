@@ -16,7 +16,7 @@ class DemandeDecaissement(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-
+    reference = models.CharField(max_length=20, unique=True, blank=True)
     # Références externes (microservices)
     demandes_rh_ids = models.JSONField(default=list, blank=True)
     demandes_stock_ids = models.JSONField(default=list, blank=True)
