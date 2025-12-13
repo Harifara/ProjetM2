@@ -2,6 +2,8 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+import requests
+
   # si tu utilises des codes de statut
 
 from .models import DemandeDecaissement, Depense
