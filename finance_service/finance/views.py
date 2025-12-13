@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 import requests
+from django.conf import settings
 
   # si tu utilises des codes de statut
 
