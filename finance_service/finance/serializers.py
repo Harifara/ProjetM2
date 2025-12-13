@@ -1,50 +1,98 @@
-# finance/serializers.py
 from rest_framework import serializers
-from .models import DemandeDecaissement, Depense, DepenseFinale
+from decimal import Decimal
+
+from .models import DemandeDecaissement, Depense
+
 
 class DepenseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Depense
         fields = [
             'id',
-            'description',
+            'decaissement',
             'montant',
-            'statut',
-            'date_creation',
+            'mode_paiement',
+            'reference',
+            'paye_par_id',
+            'date_depense',
         ]
+        read_only_fields = ['id', 'date_depense']
 
-class DepenseFinaleSerializer(serializers.ModelSerializer):
-    depense = DepenseSerializer(read_only=True)
+    def validate_montant(self, value):
+        if value <= Decimal('0'):
+            raise serializers.ValidationError(
+                "Le montant doit être supérieur à zéro."
+            )
+        return value
 
+    def validate(self, attrs):
+        decaissement = attrs.get('decaissement')
+        if decaissement.statut != 'approuve':
+            raise serializers.ValidationError(
+                "Une dépense ne peut être créée que pour un décaissement approuvé."
+            )
+        return attrs
+
+
+class DemandeDecaissementListSerializer(serializers.ModelSerializer):
     class Meta:
-        model = DepenseFinale
+        model = DemandeDecaissement
         fields = [
             'id',
-            'depense',
-            'montant',
+            'montant_total',
+            'statut',
             'date_creation',
-            'paye',
+            'date_decaissement',
         ]
 
-class DemandeDecaissementSerializer(serializers.ModelSerializer):
+
+class DemandeDecaissementDetailSerializer(serializers.ModelSerializer):
     depenses = DepenseSerializer(many=True, read_only=True)
-    statut = serializers.CharField(read_only=True)  # <-- retirer source='statut'
 
     class Meta:
         model = DemandeDecaissement
         fields = [
             'id',
-            'source_service',
-            'created_by',
-            'date_creation',
-            'demande_id',
-            'demandeAchat_id',
-            'envoyee',
-            'coordo_decision',
-            'coordo_id',
-            'coordo_date',
-            'coordo_commentaire',
-            'total_montant',
+            'demandes_rh_ids',
+            'demandes_stock_ids',
+            'montant_total',
             'statut',
+            'cree_par_id',
+            'date_creation',
+            'date_decaissement',
             'depenses',
         ]
+
+
+class DemandeDecaissementCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DemandeDecaissement
+        fields = [
+            'id',
+            'demandes_rh_ids',
+            'demandes_stock_ids',
+            'montant_total',
+            'cree_par_id',
+        ]
+        read_only_fields = ['id']
+
+    def validate(self, attrs):
+        if not attrs.get('demandes_rh_ids') and not attrs.get('demandes_stock_ids'):
+            raise serializers.ValidationError(
+                "Au moins une demande RH ou Stock est obligatoire."
+            )
+
+        if attrs.get('montant_total', Decimal('0')) <= Decimal('0'):
+            raise serializers.ValidationError(
+                "Le montant total doit être supérieur à zéro."
+            )
+
+        return attrs
+
+
+class SoumettreCoordonnateurSerializer(serializers.Serializer):
+    def update(self, instance, validated_data):
+        instance.soumettre_coordonnateur()
+        return instance
+
+

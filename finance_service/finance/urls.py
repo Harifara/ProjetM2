@@ -9,3 +9,4 @@ router.register(r'depenses', DepenseViewSet, basename='depense')
 urlpatterns = [
     path('', include(router.urls)),
 ]
+
