@@ -42,7 +42,7 @@ class DemandeDecaissement(models.Model):
     def save(self, *args, **kwargs):
         if not self.reference:
             # Exemple : DEC-20251213-001 (date + auto-increment)
-            last = Decaissement.objects.filter(date_creation__date=self.date_creation.date()).count() + 1
+            last = DemandeDecaissement.objects.filter(date_creation__date=self.date_creation.date()).count() + 1
             self.reference = f"DEC-{self.date_creation:%Y%m%d}-{last:03d}"
         super().save(*args, **kwargs)
 
