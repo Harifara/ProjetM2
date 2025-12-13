@@ -17,18 +17,10 @@ class DemandeDecaissement(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     reference = models.CharField(max_length=20, unique=True, blank=True)
-    # Références externes (microservices)
     demandes_rh_ids = models.JSONField(default=list, blank=True)
     demandes_stock_ids = models.JSONField(default=list, blank=True)
-
-    montant_total = models.DecimalField(
-        max_digits=15, decimal_places=2, default=Decimal('0.00')
-    )
-
-    statut = models.CharField(
-        max_length=30, choices=STATUT_CHOICES, default='brouillon'
-    )
-
+    montant_total = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
+    statut = models.CharField(max_length=30, choices=STATUT_CHOICES, default='brouillon')
     cree_par_id = models.UUIDField(help_text="UUID utilisateur finance")
     date_creation = models.DateTimeField(auto_now_add=True)
     date_decaissement = models.DateTimeField(null=True, blank=True)
@@ -41,14 +33,11 @@ class DemandeDecaissement(models.Model):
     
     def save(self, *args, **kwargs):
         if not self.reference:
-            # Exemple : DEC-20251213-001 (date + auto-increment)
-            last = DemandeDecaissement.objects.filter(date_creation__date=self.date_creation.date()).count() + 1
-            self.reference = f"DEC-{self.date_creation:%Y%m%d}-{last:03d}"
+            now = self.date_creation or timezone.now()
+            last = DemandeDecaissement.objects.filter(date_creation__date=now.date()).count() + 1
+            self.reference = f"DEC-{now:%Y%m%d}-{last:03d}"
         super().save(*args, **kwargs)
 
-    # ------------------------
-    # Méthodes métier
-    # ------------------------
     def calculer_montant_total(self, montant_rh=0, montant_stock=0):
         self.montant_total = Decimal(montant_rh) + Decimal(montant_stock)
         self.save()
@@ -73,6 +62,7 @@ class DemandeDecaissement(models.Model):
         self.statut = 'decaisse'
         self.date_decaissement = timezone.now()
         self.save()
+
 
 
 class Depense(models.Model):
