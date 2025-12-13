@@ -2,7 +2,6 @@
 import uuid
 from django.db import models
 from django.utils import timezone
-from django.core.exceptions import ValidationError
 
 
 class ValidationCoordonnateur(models.Model):
@@ -12,30 +11,34 @@ class ValidationCoordonnateur(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-
     demande_decaissement_id = models.UUIDField(
         help_text="UUID de la demande de décaissement (service finance)"
     )
-
     coordonnateur_id = models.UUIDField(
         help_text="UUID utilisateur coordonnateur"
     )
-
-    decision = models.CharField(max_length=20, choices=DECISION_CHOICES)
+    decision = models.CharField(
+        max_length=20,
+        choices=DECISION_CHOICES,
+        null=True,
+        blank=True
+    )
     commentaire = models.TextField(blank=True)
-
     date_validation = models.DateTimeField(default=timezone.now)
 
     class Meta:
         ordering = ['-date_validation']
-        unique_together = ('demande_decaissement_id',)
+        constraints = [
+            models.UniqueConstraint(
+                fields=['demande_decaissement_id'],
+                name='unique_decaissement_validation'
+            )
+        ]
 
     def __str__(self):
         return f"Validation {self.demande_decaissement_id} | {self.decision}"
 
-    # ------------------------
     # Méthodes métier
-    # ------------------------
     def valider(self):
         self.decision = 'approuve'
         self.date_validation = timezone.now()
