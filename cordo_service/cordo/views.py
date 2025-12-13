@@ -25,17 +25,7 @@ class ValidationCoordonnateurViewSet(viewsets.ModelViewSet):
             context={'request': request}
         )
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-
-        # Utilisation de update_or_create pour éviter l'erreur 400 si déjà validé
-        validation, created = ValidationCoordonnateur.objects.update_or_create(
-            demande_decaissement_id=data['demande_decaissement_id'],
-            defaults={
-                'coordonnateur_id': request.user.id,
-                'decision': data['decision'],
-                'commentaire': data.get('commentaire', ''),
-            }
-        )
+        validation = serializer.save()
 
         # Appel service Finance
         finance_status = "non testé"
@@ -45,14 +35,19 @@ class ValidationCoordonnateurViewSet(viewsets.ModelViewSet):
                 json={
                     "decision": validation.decision,
                     "commentaire": validation.commentaire,
+                    # ajouter ici les champs nécessaires attendus par Finance, ex: "coordonnateur_id": validation.coordonnateur_id
                 },
                 timeout=5
             )
             response.raise_for_status()
             finance_status = "succès"
         except requests.RequestException as e:
-            logger.error(f"Erreur service Finance: {e}")
-            finance_status = f"échec: {str(e)}"
+            if e.response is not None:
+                logger.error(f"Erreur service Finance: {e.response.status_code} {e.response.text}")
+                finance_status = f"échec: {e.response.status_code} {e.response.text}"
+            else:
+                logger.error(f"Erreur service Finance: {str(e)}")
+                finance_status = f"échec: {str(e)}"
 
         return Response(
             {
