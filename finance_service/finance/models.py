@@ -1,9 +1,10 @@
 import uuid
 from decimal import Decimal
 from django.db import models, transaction
-from django.utils import timezone
 from django.core.exceptions import ValidationError
-
+from django.utils import timezone
+import requests
+from django.conf import settings
 
 class DemandeDecaissement(models.Model):
     STATUT_CHOICES = [
@@ -33,36 +34,65 @@ class DemandeDecaissement(models.Model):
     def save(self, *args, **kwargs):
         if not self.reference:
             now = self.date_creation or timezone.now()
-            # Génération atomique de la référence pour éviter les doublons
             with transaction.atomic():
                 last_count = DemandeDecaissement.objects.filter(date_creation__date=now.date()).count() + 1
                 self.reference = f"DEC-{now:%Y%m%d}-{last_count:03d}"
-                # Vérification rare de collision
                 while DemandeDecaissement.objects.filter(reference=self.reference).exists():
                     last_count += 1
                     self.reference = f"DEC-{now:%Y%m%d}-{last_count:03d}"
         super().save(*args, **kwargs)
 
-    # ------------------------
-    # Méthodes métier
-    # ------------------------
-    def calculer_montant_total(self, montant_rh=0, montant_stock=0):
-        self.montant_total = Decimal(montant_rh) + Decimal(montant_stock)
-        self.save()
+    # ------------------------ API RH / STOCK ------------------------
+    def update_status_rh(self, rh_id, statut):
+        url = f"{settings.RH_SERVICE_URL}/api/demandes/{rh_id}/update-status/"
+        try:
+            requests.post(url, json={"status": statut}, timeout=5)
+        except requests.RequestException:
+            pass
 
+    def update_status_stock(self, stock_id, statut):
+        url = f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/{stock_id}/update-status/"
+        try:
+            requests.post(url, json={"statut": statut}, timeout=5)
+        except requests.RequestException:
+            pass
+
+    # ------------------------ SYNCHRONISATION ------------------------
+    def synchroniser_status(self):
+        status_map = {
+            'brouillon': 'en_cours',
+            'en_attente_coordonnateur': 'en_cours',
+            'approuve': 'approuve',
+            'rejete': 'refuse',
+            'decaisse': 'decaisse',
+        }
+        mapped_status = status_map.get(self.statut, 'en_cours')
+
+        # RH
+        for rh_id in self.demandes_rh_ids:
+            self.update_status_rh(rh_id, mapped_status)
+
+        # Stock
+        for stock_id in self.demandes_stock_ids:
+            self.update_status_stock(stock_id, mapped_status)
+
+    # ------------------------ MÉTHODES MÉTIER ------------------------
     def soumettre_coordonnateur(self):
         if self.statut != 'brouillon':
             raise ValidationError("Seules les demandes en brouillon peuvent être soumises.")
         self.statut = 'en_attente_coordonnateur'
         self.save()
+        self.synchroniser_status()
 
     def approuver(self):
         self.statut = 'approuve'
         self.save()
+        self.synchroniser_status()
 
     def rejeter(self):
         self.statut = 'rejete'
         self.save()
+        self.synchroniser_status()
 
     def marquer_decaisse(self):
         if self.statut != 'approuve':
@@ -70,6 +100,19 @@ class DemandeDecaissement(models.Model):
         self.statut = 'decaisse'
         self.date_decaissement = timezone.now()
         self.save()
+        self.synchroniser_status()
+
+    # ------------------------ DEMANDES DISPONIBLES ------------------------
+    @classmethod
+    def get_demandes_deja_utilisees(cls):
+        rh_ids = []
+        stock_ids = []
+
+        for d in cls.objects.exclude(statut='rejete'):
+            rh_ids.extend(d.demandes_rh_ids)
+            stock_ids.extend(d.demandes_stock_ids)
+
+        return set(rh_ids), set(stock_ids)
 
 
 

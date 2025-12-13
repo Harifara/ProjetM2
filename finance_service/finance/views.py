@@ -44,7 +44,40 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
             {"message": "Demande soumise au coordonnateur."},
             status=status.HTTP_200_OK
         )
+        
+class DemandesDisponiblesView(APIView):
+    """
+    Retourne les demandes RH et Stock disponibles pour un nouveau décaissement.
+    """
+    def get(self, request):
+        rh_used, stock_used = DemandeDecaissement.get_demandes_deja_utilisees()
+
+        # RH
+        try:
+            resp_rh = requests.get(f"{settings.RH_SERVICE_URL}/api/demandes/?status__in=en_attente,en_cours,approuve")
+            resp_rh.raise_for_status()
+            rh_all = resp_rh.json()
+        except requests.RequestException:
+            rh_all = []
+
+        rh_available = [d for d in rh_all if d['id'] not in rh_used]
+
+        # Stock
+        try:
+            resp_stock = requests.get(f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/?statut__in=en_attente,approuve")
+            resp_stock.raise_for_status()
+            stock_all = resp_stock.json()
+        except requests.RequestException:
+            stock_all = []
+
+        stock_available = [d for d in stock_all if d['id'] not in stock_used]
+
+        return Response({
+            "rh": rh_available,
+            "stock": stock_available
+        })
 
 class DepenseViewSet(viewsets.ModelViewSet):
     queryset = Depense.objects.all()
     serializer_class = DepenseSerializer
+
