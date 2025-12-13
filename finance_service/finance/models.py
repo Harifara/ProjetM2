@@ -37,7 +37,7 @@ class DemandeDecaissement(models.Model):
         ordering = ['-date_creation']
 
     def __str__(self):
-        return f"Décaissement {self.id} | {self.statut}"
+        return f"Décaissement {self.reference or self.id} | {self.statut}"
     
     def save(self, *args, **kwargs):
         if not self.reference:
