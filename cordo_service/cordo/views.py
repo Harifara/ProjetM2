@@ -4,13 +4,12 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 import requests
 from django.conf import settings
+import logging
 
 from .models import ValidationCoordonnateur
-from .serializers import (
-    ValidationCoordonnateurSerializer,
-    ValidationCoordonnateurCreateSerializer,
-)
+from .serializers import ValidationCoordonnateurSerializer, ValidationCoordonnateurCreateSerializer
 
+logger = logging.getLogger(__name__)
 
 class ValidationCoordonnateurViewSet(viewsets.ModelViewSet):
     queryset = ValidationCoordonnateur.objects.all()
@@ -30,10 +29,10 @@ class ValidationCoordonnateurViewSet(viewsets.ModelViewSet):
         validation = serializer.save()
 
         # Appel service Finance
+        finance_status = "non testé"
         try:
             response = requests.post(
-                f"{settings.FINANCE_SERVICE_URL}/api/decaissements/"
-                f"{validation.demande_decaissement_id}/decision/",
+                f"{settings.FINANCE_SERVICE_URL}/api/decaissements/{validation.demande_decaissement_id}/decision/",
                 json={
                     "decision": validation.decision,
                     "commentaire": validation.commentaire,
@@ -41,10 +40,15 @@ class ValidationCoordonnateurViewSet(viewsets.ModelViewSet):
                 timeout=5
             )
             response.raise_for_status()
-        except requests.RequestException:
-            pass  # Log uniquement, ne bloque pas la création locale
+            finance_status = "succès"
+        except requests.RequestException as e:
+            logger.error(f"Erreur service Finance: {e}")
+            finance_status = f"échec: {str(e)}"
 
         return Response(
-            ValidationCoordonnateurSerializer(validation).data,
+            {
+                "validation": ValidationCoordonnateurSerializer(validation).data,
+                "finance_status": finance_status
+            },
             status=status.HTTP_201_CREATED
         )
