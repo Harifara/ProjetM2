@@ -59,6 +59,32 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
             )
         except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+    @action(detail=False, methods=["get"])
+    def demandes_disponibles(self, request):
+        """
+        Retourne toutes les demandes RH et Stock disponibles pour créer un décaissement.
+        """
+        rh_demandes = []
+        stock_demandes = []
+
+        # 🔹 Récupérer les demandes RH disponibles
+        try:
+            resp = requests.get(f"{settings.RH_SERVICE_URL}/api/demandes-disponibles/", timeout=5)
+            resp.raise_for_status()
+            rh_demandes = resp.json()
+        except requests.RequestException as e:
+            print(f"[Finance] Impossible de récupérer les demandes RH: {e}")
+
+        # 🔹 Récupérer les demandes Stock disponibles
+        try:
+            resp = requests.get(f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/disponibles/", timeout=5)
+            resp.raise_for_status()
+            stock_demandes = resp.json()
+        except requests.RequestException as e:
+            print(f"[Finance] Impossible de récupérer les demandes Stock: {e}")
+
+        return Response({"rh": rh_demandes, "stock": stock_demandes})
 
 
 class DepenseViewSet(viewsets.ModelViewSet):
