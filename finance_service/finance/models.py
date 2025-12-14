@@ -42,7 +42,6 @@ class DemandeDecaissement(models.Model):
             montant = Decimal(str(resp.json().get("montant", 0)))
             total += montant
         except requests.RequestException as e:
-            # Log l'erreur et continue
             print(f"[Finance] Impossible de récupérer le montant RH pour {rh_id}: {e}")
 
     # 🔹 Calcul montant des demandes Stock
@@ -53,10 +52,10 @@ class DemandeDecaissement(models.Model):
             montant = Decimal(str(resp.json().get("montant", 0)))
             total += montant
         except requests.RequestException as e:
-            # Log l'erreur et continue
             print(f"[Finance] Impossible de récupérer le montant Stock pour {stock_id}: {e}")
 
     self.montant_total = total
+
 
     @classmethod
     def get_demandes_deja_utilisees(cls):
