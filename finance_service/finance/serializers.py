@@ -4,21 +4,31 @@ from .models import DemandeDecaissement, Depense
 class DemandeDecaissementListSerializer(serializers.ModelSerializer):
     class Meta:
         model = DemandeDecaissement
-        fields = ['id','reference','montant_total','statut','date_creation']
+        fields = ['id', 'reference', 'montant_total', 'statut', 'date_creation']
 
 class DemandeDecaissementDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = DemandeDecaissement
-        fields='__all__'
-        read_only_fields=['id','reference','montant_total','statut','date_creation','date_decaissement']
+        fields = '__all__'
+        read_only_fields = [
+            'id', 'reference', 'montant_total', 'statut',
+            'date_creation', 'date_decaissement', 'cree_par_id'
+        ]
 
 class DemandeDecaissementCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = DemandeDecaissement
-        fields=['demandes_rh_ids','demandes_stock_ids']
+        fields = ['demandes_rh_ids', 'demandes_stock_ids']
+
     def create(self, validated_data):
-        user=self.context['request'].user
-        return DemandeDecaissement.objects.create(cree_par_id=user.id, **validated_data)
+        user = self.context['request'].user
+        instance = DemandeDecaissement.objects.create(
+            cree_par_id=user.id, **validated_data
+        )
+        # recalcul automatique du montant total
+        instance.recalculer_montant_total()
+        instance.save()
+        return instance
 
 class SoumettreCoordonnateurSerializer(serializers.Serializer):
     def save(self, **kwargs):
@@ -29,9 +39,11 @@ class SoumettreCoordonnateurSerializer(serializers.Serializer):
 class DepenseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Depense
-        fields='__all__'
-        read_only_fields=['id','date_depense']
+        fields = '__all__'
+        read_only_fields = ['id', 'date_depense']
+
     def validate(self, attrs):
-        if attrs['decaissement'].statut != 'approuve':
+        decaissement = attrs['decaissement']
+        if decaissement.statut != 'approuve':
             raise serializers.ValidationError("Décaissement non approuvé")
         return attrs

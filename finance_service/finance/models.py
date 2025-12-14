@@ -15,6 +15,7 @@ class DemandeDecaissement(models.Model):
         ('rejete','Rejeté'),
         ('decaisse','Décaissé'),
     ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     reference = models.CharField(max_length=30, unique=True, blank=True)
     demandes_rh_ids = models.JSONField(default=list, blank=True)
@@ -33,32 +34,41 @@ class DemandeDecaissement(models.Model):
 
     def recalculer_montant_total(self):
         total = Decimal("0.00")
+        valid_rh_ids = []
+        valid_stock_ids = []
 
-    # 🔹 Calcul montant des demandes RH
-        for rh_id in getattr(self, 'demandes_rh_ids', []):
+        # 🔹 Montants RH
+        for rh_id in self.demandes_rh_ids:
             try:
-                resp = requests.get(f"{settings.RH_SERVICE_URL}/api/demandes/{rh_id}/montant/", timeout=5)
+                resp = requests.get(
+                    f"{settings.RH_SERVICE_URL}/api/demandes/{rh_id}/montant/",
+                    timeout=5
+                )
                 resp.raise_for_status()
                 montant = Decimal(str(resp.json().get("montant", 0)))
                 total += montant
-            except requests.HTTPError as e:
-                print(f"[Finance] Montant RH non récupéré pour {rh_id} (HTTP {resp.status_code})")
+                valid_rh_ids.append(rh_id)
             except requests.RequestException as e:
                 print(f"[Finance] Impossible de récupérer le montant RH pour {rh_id}: {e}")
 
-
-        # 🔹 Calcul montant des demandes Stock
-        for stock_id in getattr(self, 'demandes_stock_ids', []):
+        # 🔹 Montants Stock
+        for stock_id in self.demandes_stock_ids:
             try:
-                resp = requests.get(f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/{stock_id}/montant/", timeout=5)
+                resp = requests.get(
+                    f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/{stock_id}/montant/",
+                    timeout=5
+                )
                 resp.raise_for_status()
                 montant = Decimal(str(resp.json().get("montant", 0)))
                 total += montant
+                valid_stock_ids.append(stock_id)
             except requests.RequestException as e:
                 print(f"[Finance] Impossible de récupérer le montant Stock pour {stock_id}: {e}")
 
+        # Mettre à jour les montants et IDs valides
         self.montant_total = total
-
+        self.demandes_rh_ids = valid_rh_ids
+        self.demandes_stock_ids = valid_stock_ids
 
     @classmethod
     def get_demandes_deja_utilisees(cls):
@@ -70,24 +80,26 @@ class DemandeDecaissement(models.Model):
 
     def clean(self):
         rh_used, stock_used = self.get_demandes_deja_utilisees()
-        for i in self.demandes_rh_ids:
-            if i in rh_used and not self.pk:
-                raise ValidationError(f"Demande RH déjà utilisée : {i}")
-        for i in self.demandes_stock_ids:
-            if i in stock_used and not self.pk:
-                raise ValidationError(f"Demande Stock déjà utilisée : {i}")
+        for rh_id in self.demandes_rh_ids:
+            if rh_id in rh_used and not self.pk:
+                raise ValidationError(f"Demande RH déjà utilisée : {rh_id}")
+        for stock_id in self.demandes_stock_ids:
+            if stock_id in stock_used and not self.pk:
+                raise ValidationError(f"Demande Stock déjà utilisée : {stock_id}")
 
-    def save(self,*args,**kwargs):
+    def save(self, *args, **kwargs):
         creating = self._state.adding
         self.full_clean()
         if creating:
             self.recalculer_montant_total()
+
         if not self.reference:
             now = timezone.now()
             with transaction.atomic():
                 count = DemandeDecaissement.objects.filter(date_creation__date=now.date()).count() + 1
                 self.reference = f"DEC-{now:%Y%m%d}-{count:03d}"
-        super().save(*args,**kwargs)
+
+        super().save(*args, **kwargs)
 
     def synchroniser_status(self):
         status_map = {
@@ -97,11 +109,27 @@ class DemandeDecaissement(models.Model):
             'rejete':'refuse',
             'decaisse':'decaisse',
         }
-        mapped = status_map[self.statut]
+        mapped = status_map.get(self.statut, 'en_cours')
+
         for rh_id in self.demandes_rh_ids:
-            requests.post(f"{settings.RH_SERVICE_URL}/api/demandes/{rh_id}/update-status/", json={"status":mapped}, timeout=5)
+            try:
+                requests.post(
+                    f"{settings.RH_SERVICE_URL}/api/demandes/{rh_id}/update-status/",
+                    json={"status": mapped},
+                    timeout=5
+                )
+            except requests.RequestException as e:
+                print(f"[Finance] Impossible de synchroniser statut RH {rh_id}: {e}")
+
         for stock_id in self.demandes_stock_ids:
-            requests.post(f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/{stock_id}/update-status/", json={"statut":mapped}, timeout=5)
+            try:
+                requests.post(
+                    f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/{stock_id}/update-status/",
+                    json={"statut": mapped},
+                    timeout=5
+                )
+            except requests.RequestException as e:
+                print(f"[Finance] Impossible de synchroniser statut Stock {stock_id}: {e}")
 
     def soumettre_coordonnateur(self):
         if self.statut != 'brouillon':
@@ -113,23 +141,19 @@ class DemandeDecaissement(models.Model):
     def appliquer_decision_coordonnateur(self, decision):
         if self.statut != 'en_attente_coordonnateur':
             raise ValidationError("Décaissement déjà traité")
-        if decision=='approuve':
-            self.statut='approuve'
-        elif decision=='rejete':
-            self.statut='rejete'
-        else:
+        if decision not in ['approuve', 'rejete']:
             raise ValidationError("Décision invalide")
+        self.statut = decision
         self.save()
         self.synchroniser_status()
 
     def marquer_decaisse(self):
         if self.statut != 'approuve':
             raise ValidationError("Décaissement non approuvé")
-        self.statut='decaisse'
-        self.date_decaissement=timezone.now()
+        self.statut = 'decaisse'
+        self.date_decaissement = timezone.now()
         self.save()
         self.synchroniser_status()
-
 
 class Depense(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
