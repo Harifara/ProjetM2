@@ -20,7 +20,7 @@ jobs:
 
     - name: Copy files to EC2
       run: |
-        ssh -o StrictHostKeyChecking=no ubuntu@YOUR_EC2_IP "
+        ssh -o StrictHostKeyChecking=no ubuntu@51.21.42.34 "
           cd /home/ubuntu/backend &&
           git pull origin main &&
           docker-compose down &&
