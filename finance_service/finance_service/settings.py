@@ -90,7 +90,8 @@ JWT_ISSUER = "auth-service"
 
 AUTH_SERVICE_URL = config("AUTH_SERVICE_URL", default="http://auth_service:8000")
 RH_SERVICE_URL = config("RH_SERVICE_URL", default="http://rh_service:8000")
-STOCK_SERVICE_URL = os.getenv("STOCK_SERVICE_URL", "http://stock_service:8000")
+CORDO_SERVICE_URL = config("CORDO_SERVICE_URL", default="http://cordo_service:8000")
+STOCK_SERVICE_URL = config("STOCK_SERVICE_URL", default="http://stock_service:8000")
 
 LANGUAGE_CODE = "fr-fr"
 TIME_ZONE = "Indian/Antananarivo"
