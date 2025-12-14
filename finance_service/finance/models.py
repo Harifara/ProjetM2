@@ -1,27 +1,27 @@
+# finance/models.py
 import uuid
 from decimal import Decimal
 from django.db import models, transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-import requests
 from django.conf import settings
+import requests
 
 class DemandeDecaissement(models.Model):
     STATUT_CHOICES = [
-        ('brouillon', 'Brouillon'),
-        ('en_attente_coordonnateur', 'En attente validation coordonnateur'),
-        ('approuve', 'Approuvé'),
-        ('rejete', 'Rejeté'),
-        ('decaisse', 'Décaissement effectué'),
+        ('brouillon','Brouillon'),
+        ('en_attente_coordonnateur','En attente coordonnateur'),
+        ('approuve','Approuvé'),
+        ('rejete','Rejeté'),
+        ('decaisse','Décaissé'),
     ]
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    reference = models.CharField(max_length=20, unique=True, blank=True)
+    reference = models.CharField(max_length=30, unique=True, blank=True)
     demandes_rh_ids = models.JSONField(default=list, blank=True)
     demandes_stock_ids = models.JSONField(default=list, blank=True)
-    montant_total = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
+    montant_total = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal("0.00"))
     statut = models.CharField(max_length=30, choices=STATUT_CHOICES, default='brouillon')
-    cree_par_id = models.UUIDField(help_text="UUID utilisateur finance")
+    cree_par_id = models.UUIDField()
     date_creation = models.DateTimeField(auto_now_add=True)
     date_decaissement = models.DateTimeField(null=True, blank=True)
 
@@ -29,122 +29,95 @@ class DemandeDecaissement(models.Model):
         ordering = ['-date_creation']
 
     def __str__(self):
-        return f"Décaissement {self.reference or self.id} | {self.statut}"
+        return f"{self.reference} | {self.montant_total} Ar"
 
-    def save(self, *args, **kwargs):
+    def recalculer_montant_total(self):
+        total = Decimal("0.00")
+        for rh_id in self.demandes_rh_ids:
+            resp = requests.get(f"{settings.RH_SERVICE_URL}/api/demandes/{rh_id}/montant/", timeout=5)
+            resp.raise_for_status()
+            total += Decimal(str(resp.json().get("montant",0)))
+        for stock_id in self.demandes_stock_ids:
+            resp = requests.get(f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/{stock_id}/montant/", timeout=5)
+            resp.raise_for_status()
+            total += Decimal(str(resp.json().get("montant",0)))
+        self.montant_total = total
+
+    @classmethod
+    def get_demandes_deja_utilisees(cls):
+        rh_ids, stock_ids = set(), set()
+        for d in cls.objects.exclude(statut='rejete'):
+            rh_ids.update(d.demandes_rh_ids)
+            stock_ids.update(d.demandes_stock_ids)
+        return rh_ids, stock_ids
+
+    def clean(self):
+        rh_used, stock_used = self.get_demandes_deja_utilisees()
+        for i in self.demandes_rh_ids:
+            if i in rh_used and not self.pk:
+                raise ValidationError(f"Demande RH déjà utilisée : {i}")
+        for i in self.demandes_stock_ids:
+            if i in stock_used and not self.pk:
+                raise ValidationError(f"Demande Stock déjà utilisée : {i}")
+
+    def save(self,*args,**kwargs):
+        creating = self._state.adding
+        self.full_clean()
+        if creating:
+            self.recalculer_montant_total()
         if not self.reference:
-            now = self.date_creation or timezone.now()
+            now = timezone.now()
             with transaction.atomic():
-                last_count = DemandeDecaissement.objects.filter(date_creation__date=now.date()).count() + 1
-                self.reference = f"DEC-{now:%Y%m%d}-{last_count:03d}"
-                while DemandeDecaissement.objects.filter(reference=self.reference).exists():
-                    last_count += 1
-                    self.reference = f"DEC-{now:%Y%m%d}-{last_count:03d}"
-        super().save(*args, **kwargs)
+                count = DemandeDecaissement.objects.filter(date_creation__date=now.date()).count() + 1
+                self.reference = f"DEC-{now:%Y%m%d}-{count:03d}"
+        super().save(*args,**kwargs)
 
-    # ------------------------ API RH / STOCK ------------------------
-    def update_status_rh(self, rh_id, statut):
-        url = f"{settings.RH_SERVICE_URL}/api/demandes/{rh_id}/update-status/"
-        try:
-            requests.post(url, json={"status": statut}, timeout=5)
-        except requests.RequestException:
-            pass
-
-    def update_status_stock(self, stock_id, statut):
-        url = f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/{stock_id}/update-status/"
-        try:
-            requests.post(url, json={"statut": statut}, timeout=5)
-        except requests.RequestException:
-            pass
-
-    # ------------------------ SYNCHRONISATION ------------------------
     def synchroniser_status(self):
         status_map = {
-            'brouillon': 'en_cours',
-            'en_attente_coordonnateur': 'en_cours',
-            'approuve': 'approuve',
-            'rejete': 'refuse',
-            'decaisse': 'decaisse',
+            'brouillon':'en_cours',
+            'en_attente_coordonnateur':'en_cours',
+            'approuve':'approuve',
+            'rejete':'refuse',
+            'decaisse':'decaisse',
         }
-        mapped_status = status_map.get(self.statut, 'en_cours')
-
-        # RH
+        mapped = status_map[self.statut]
         for rh_id in self.demandes_rh_ids:
-            self.update_status_rh(rh_id, mapped_status)
-
-        # Stock
+            requests.post(f"{settings.RH_SERVICE_URL}/api/demandes/{rh_id}/update-status/", json={"status":mapped}, timeout=5)
         for stock_id in self.demandes_stock_ids:
-            self.update_status_stock(stock_id, mapped_status)
+            requests.post(f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/{stock_id}/update-status/", json={"statut":mapped}, timeout=5)
 
-    # ------------------------ MÉTHODES MÉTIER ------------------------
     def soumettre_coordonnateur(self):
         if self.statut != 'brouillon':
-            raise ValidationError("Seules les demandes en brouillon peuvent être soumises.")
+            raise ValidationError("Seul un brouillon peut être soumis")
         self.statut = 'en_attente_coordonnateur'
         self.save()
         self.synchroniser_status()
 
-    def approuver(self):
-        self.statut = 'approuve'
-        self.save()
-        self.synchroniser_status()
-
-    def rejeter(self):
-        self.statut = 'rejete'
+    def appliquer_decision_coordonnateur(self, decision):
+        if self.statut != 'en_attente_coordonnateur':
+            raise ValidationError("Décaissement déjà traité")
+        if decision=='approuve':
+            self.statut='approuve'
+        elif decision=='rejete':
+            self.statut='rejete'
+        else:
+            raise ValidationError("Décision invalide")
         self.save()
         self.synchroniser_status()
 
     def marquer_decaisse(self):
         if self.statut != 'approuve':
-            raise ValidationError("Décaissement autorisé uniquement après approbation.")
-        self.statut = 'decaisse'
-        self.date_decaissement = timezone.now()
+            raise ValidationError("Décaissement non approuvé")
+        self.statut='decaisse'
+        self.date_decaissement=timezone.now()
         self.save()
         self.synchroniser_status()
 
-    # ------------------------ DEMANDES DISPONIBLES ------------------------
-    @classmethod
-    def get_demandes_deja_utilisees(cls):
-        rh_ids = []
-        stock_ids = []
-
-        for d in cls.objects.exclude(statut='rejete'):
-            rh_ids.extend(d.demandes_rh_ids)
-            stock_ids.extend(d.demandes_stock_ids)
-
-        return set(rh_ids), set(stock_ids)
-
-
 
 class Depense(models.Model):
-    MODE_PAIEMENT_CHOICES = [
-        ('espece', 'Espèce'),
-        ('virement', 'Virement bancaire'),
-        ('cheque', 'Chèque'),
-        ('mobile_money', 'Mobile Money'),
-    ]
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-
-    decaissement = models.ForeignKey(
-        DemandeDecaissement,
-        on_delete=models.PROTECT,
-        related_name='depenses'
-    )
-
+    decaissement = models.ForeignKey(DemandeDecaissement, on_delete=models.PROTECT, related_name='depenses')
     montant = models.DecimalField(max_digits=15, decimal_places=2)
-    mode_paiement = models.CharField(max_length=20, choices=MODE_PAIEMENT_CHOICES)
-    reference = models.CharField(max_length=255, blank=True)
-
-    paye_par_id = models.UUIDField(help_text="UUID agent finance")
+    mode_paiement = models.CharField(max_length=20)
+    paye_par_id = models.UUIDField()
     date_depense = models.DateTimeField(default=timezone.now)
-
-    class Meta:
-        ordering = ['-date_depense']
-
-    def __str__(self):
-        return f"Dépense {self.id} | {self.montant}"
-
-    @staticmethod
-    def lister_depenses(decaissement_id):
-        return Depense.objects.filter(decaissement_id=decaissement_id)
