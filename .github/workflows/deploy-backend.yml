@@ -1,0 +1,29 @@
+name: Deploy Django Backend
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up SSH
+      uses: webfactory/ssh-agent@v0.8.1
+      with:
+        ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+    - name: Copy files to EC2
+      run: |
+        ssh -o StrictHostKeyChecking=no ubuntu@YOUR_EC2_IP "
+          cd /home/ubuntu/backend &&
+          git pull origin main &&
+          docker-compose down &&
+          docker-compose build &&
+          docker-compose up -d
+        "
