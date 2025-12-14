@@ -33,15 +33,30 @@ class DemandeDecaissement(models.Model):
 
     def recalculer_montant_total(self):
         total = Decimal("0.00")
-        for rh_id in self.demandes_rh_ids:
+
+    # 🔹 Calcul montant des demandes RH
+    for rh_id in getattr(self, 'demandes_rh_ids', []):
+        try:
             resp = requests.get(f"{settings.RH_SERVICE_URL}/api/demandes/{rh_id}/montant/", timeout=5)
             resp.raise_for_status()
-            total += Decimal(str(resp.json().get("montant",0)))
-        for stock_id in self.demandes_stock_ids:
+            montant = Decimal(str(resp.json().get("montant", 0)))
+            total += montant
+        except requests.RequestException as e:
+            # Log l'erreur et continue
+            print(f"[Finance] Impossible de récupérer le montant RH pour {rh_id}: {e}")
+
+    # 🔹 Calcul montant des demandes Stock
+    for stock_id in getattr(self, 'demandes_stock_ids', []):
+        try:
             resp = requests.get(f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/{stock_id}/montant/", timeout=5)
             resp.raise_for_status()
-            total += Decimal(str(resp.json().get("montant",0)))
-        self.montant_total = total
+            montant = Decimal(str(resp.json().get("montant", 0)))
+            total += montant
+        except requests.RequestException as e:
+            # Log l'erreur et continue
+            print(f"[Finance] Impossible de récupérer le montant Stock pour {stock_id}: {e}")
+
+    self.montant_total = total
 
     @classmethod
     def get_demandes_deja_utilisees(cls):
