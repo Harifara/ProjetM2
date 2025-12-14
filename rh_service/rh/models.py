@@ -632,15 +632,16 @@ class Demande(models.Model):
     STATUS_CHOICES = [
         ('en_attente', 'En attente'),
         ('en_cours', 'En cours'),
-        ('approuve', 'Approuvé'),
+        ('en_decaissement', 'En demande de décaissement'),
+        ('valide', 'Validé'),
         ('refuse', 'Refusé'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     description = models.TextField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente')
-    achats = models.ManyToManyField(Achat, related_name='demandes', blank=True)
-    payements = models.ManyToManyField(Payement, related_name='demandes', blank=True)
+    achats = models.ManyToManyField('Achat', related_name='demandes', blank=True)
+    payements = models.ManyToManyField('Payement', related_name='demandes', blank=True)
     date_demande = models.DateTimeField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -657,13 +658,18 @@ class Demande(models.Model):
         return total_achats + total_payements
 
     def update_status(self):
+        """
+        Met à jour automatiquement le statut en fonction des achats et paiements.
+        - 'valide' si tous les achats sont valides et tous les paiements complets
+        - 'refuse' si au moins un achat refusé ou un paiement échoué
+        - 'en_cours' sinon (sauf si déjà en_decaissement)
+        """
         if all(a.statut == 'valide' for a in self.achats.all()) and \
            all(p.status == 'complete' for p in self.payements.all()):
-            self.status = 'approuve'
+            self.status = 'valide'
         elif any(a.statut == 'refuse' for a in self.achats.all()) or \
              any(p.status == 'echoue' for p in self.payements.all()):
             self.status = 'refuse'
-        else:
+        elif self.status != 'en_decaissement':
             self.status = 'en_cours'
         self.save()
-

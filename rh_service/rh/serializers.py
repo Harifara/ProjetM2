@@ -379,6 +379,7 @@ class AchatSerializer(serializers.ModelSerializer):
 
 # -------------------- Demande --------------------
 class DemandeSerializer(serializers.ModelSerializer):
+    # Relations ManyToMany
     achats = AchatSerializer(many=True, read_only=True)
     achats_ids = serializers.PrimaryKeyRelatedField(
         queryset=Achat.objects.all(),
@@ -386,6 +387,7 @@ class DemandeSerializer(serializers.ModelSerializer):
         write_only=True,
         source='achats'
     )
+
     payements = PayementSerializer(many=True, read_only=True)
     payements_ids = serializers.PrimaryKeyRelatedField(
         queryset=Payement.objects.all(),
@@ -394,16 +396,23 @@ class DemandeSerializer(serializers.ModelSerializer):
         source='payements'
     )
 
+    # Champ calculé pour le montant total
     montant = serializers.SerializerMethodField()
 
     class Meta:
         model = Demande
         fields = [
-            'id', 'description', 'status', 'date_demande',
-            'achats', 'achats_ids',
-            'payements', 'payements_ids',
+            'id',
+            'description',
+            'status',
+            'date_demande',
+            'achats',
+            'achats_ids',
+            'payements',
+            'payements_ids',
             'montant',
-            'created_at', 'updated_at'
+            'created_at',
+            'updated_at',
         ]
 
     def get_montant(self, obj):

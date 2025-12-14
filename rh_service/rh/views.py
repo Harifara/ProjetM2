@@ -322,24 +322,43 @@ class PayementViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
     
 class DemandeViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet pour gérer les demandes RH
+    - Affiche toutes les demandes
+    - Permet d'approuver ou de refuser une demande
+    """
     queryset = Demande.objects.prefetch_related('achats', 'payements').all()
     serializer_class = DemandeSerializer
+
+    # Filtres, recherche et tri
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['status']  # supprimer employer
-    search_fields = ['description']  # supprimer employer__nom_employer etc.
-    ordering_fields = ['date_demande', 'montant']
+    filterset_fields = ['status']  # filtrer selon le status
+    search_fields = ['description']  # recherche sur la description
+    ordering_fields = ['date_demande', 'created_at']
     ordering = ['-date_demande']
+
+    def get_queryset(self):
+        """
+        Optionnel : filtrer automatiquement pour exclure les demandes déjà en décaissement
+        """
+        return self.queryset.exclude(status='en_decaissement')
 
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
+        """
+        Valide la demande (status = 'valide')
+        """
         demande = self.get_object()
-        demande.status = 'approuve'
+        demande.status = 'valide'
         demande.save()
         serializer = self.get_serializer(demande)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
+        """
+        Refuse la demande (status = 'refuse')
+        """
         demande = self.get_object()
         demande.status = 'refuse'
         demande.save()

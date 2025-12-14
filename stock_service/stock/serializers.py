@@ -240,15 +240,14 @@ class DemandeAchatSerializer(serializers.ModelSerializer):
         model = DemandeAchat
         fields = [
             'id', 'numero', 'article', 'article_id', 'quantite', 'montant_estime',
-            'statut', 'demandeur_id', 'finance_valideur_id', 'justification',
-            'date_validation_finance', 'commentaire_finance',
+            'statut', 'demandeur_id', 'justification',
             'statut_reception', 'date_reception', 'magasin_reception_id',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
-            'id', 'numero', 'statut', 'demandeur_id', 'finance_valideur_id',
-            'date_validation_finance', 'commentaire_finance',
-            'statut_reception', 'date_reception', 'created_at', 'updated_at'
+            'id', 'numero', 'statut', 'demandeur_id',
+            'statut_reception', 'date_reception', 'magasin_reception_id',
+            'created_at', 'updated_at'
         ]
 
     def create(self, validated_data):
@@ -258,19 +257,19 @@ class DemandeAchatSerializer(serializers.ModelSerializer):
 
         try:
             article = Article.objects.get(id=article_id)
-        except (ObjectDoesNotExist, ValueError):
+        except (Article.DoesNotExist, ValueError):
             raise serializers.ValidationError({"article_id": "Article introuvable ou UUID invalide."})
 
         validated_data['article'] = article
 
-        # Générer le numéro unique côté backend
+        # Générer un numéro unique
         validated_data['numero'] = f"DA-{uuid.uuid4().hex[:8].upper()}"
 
         # Assigner le demandeur depuis le contexte
         demandeur = self.context['request'].user
         validated_data['demandeur_id'] = demandeur.id
 
-        # Sécuriser types
+        # Assurer le type correct
         validated_data['quantite'] = int(validated_data.get('quantite', 1))
         validated_data['montant_estime'] = Decimal(validated_data.get('montant_estime', 0))
 

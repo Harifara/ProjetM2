@@ -1,18 +1,12 @@
+# finance/urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import (
-    DemandeDecaissementViewSet,
-    DepenseViewSet,
-    DecisionDecaissementView,
-    DemandesDisponiblesView,
-)
+from .views import DemandeDecaissementViewSet, DepenseViewSet
 
 router = DefaultRouter()
-router.register("decaissements", DemandeDecaissementViewSet, basename="decaissements")
-router.register("depenses", DepenseViewSet, basename="depenses")
+router.register(r'decaissements', DemandeDecaissementViewSet, basename='decaissements')
+router.register(r'depenses', DepenseViewSet, basename='depenses')
 
 urlpatterns = [
-    path("", include(router.urls)),
-    path("decaissements/<uuid:decaissement_id>/decision/", DecisionDecaissementView.as_view(), name="decision-decaissement"),
-    path("demandes-disponibles/", DemandesDisponiblesView.as_view(), name="demandes-disponibles"),
+    path('api/finance/', include(router.urls)),
 ]

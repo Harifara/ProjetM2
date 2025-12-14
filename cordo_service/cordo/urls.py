@@ -1,8 +1,8 @@
-from django.urls import path, include
+# coordonnateur/urls.py
 from rest_framework.routers import DefaultRouter
 from .views import ValidationCoordonnateurViewSet
 
 router = DefaultRouter()
-router.register(r'validations', ValidationCoordonnateurViewSet)
+router.register('validations', ValidationCoordonnateurViewSet, basename='validation-coordonnateur')
 
-urlpatterns=[path('',include(router.urls))]
+urlpatterns = router.urls
