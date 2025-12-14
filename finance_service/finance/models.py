@@ -35,26 +35,26 @@ class DemandeDecaissement(models.Model):
         total = Decimal("0.00")
 
     # 🔹 Calcul montant des demandes RH
-    for rh_id in getattr(self, 'demandes_rh_ids', []):
-        try:
-            resp = requests.get(f"{settings.RH_SERVICE_URL}/api/demandes/{rh_id}/montant/", timeout=5)
-            resp.raise_for_status()
-            montant = Decimal(str(resp.json().get("montant", 0)))
-            total += montant
-        except requests.RequestException as e:
-            print(f"[Finance] Impossible de récupérer le montant RH pour {rh_id}: {e}")
+        for rh_id in getattr(self, 'demandes_rh_ids', []):
+            try:
+                resp = requests.get(f"{settings.RH_SERVICE_URL}/api/demandes/{rh_id}/montant/", timeout=5)
+                resp.raise_for_status()
+                montant = Decimal(str(resp.json().get("montant", 0)))
+                total += montant
+            except requests.RequestException as e:
+                print(f"[Finance] Impossible de récupérer le montant RH pour {rh_id}: {e}")
 
-    # 🔹 Calcul montant des demandes Stock
-    for stock_id in getattr(self, 'demandes_stock_ids', []):
-        try:
-            resp = requests.get(f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/{stock_id}/montant/", timeout=5)
-            resp.raise_for_status()
-            montant = Decimal(str(resp.json().get("montant", 0)))
-            total += montant
-        except requests.RequestException as e:
-            print(f"[Finance] Impossible de récupérer le montant Stock pour {stock_id}: {e}")
+        # 🔹 Calcul montant des demandes Stock
+        for stock_id in getattr(self, 'demandes_stock_ids', []):
+            try:
+                resp = requests.get(f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/{stock_id}/montant/", timeout=5)
+                resp.raise_for_status()
+                montant = Decimal(str(resp.json().get("montant", 0)))
+                total += montant
+            except requests.RequestException as e:
+                print(f"[Finance] Impossible de récupérer le montant Stock pour {stock_id}: {e}")
 
-    self.montant_total = total
+        self.montant_total = total
 
 
     @classmethod
