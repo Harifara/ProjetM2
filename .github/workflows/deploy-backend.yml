@@ -23,8 +23,7 @@ jobs:
         ssh -o StrictHostKeyChecking=no ubuntu@51.21.42.34 "
           cd /home/ubuntu/ProjetM2 &&
           git pull origin main &&
-          docker-compose down &&
-          docker-compose build &&
-          docker-compose up -d
+          docker compose down &&
+          docker compose build &&
+          docker compose up -d
         "
-#ddddd
