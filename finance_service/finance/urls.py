@@ -6,7 +6,8 @@ router = DefaultRouter()
 router.register(r'decaissements', DemandeDecaissementViewSet)
 router.register(r'depenses', DepenseViewSet)
 
-urlpatterns=[
-    path('', include(router.urls)),
-    path('coordonnateur/decaissements/<uuid:decaissement_id>/decision/', DecisionDecaissementView.as_view())
+urlpatterns = [
+    # ✅ Préfixe API pour correspondre au frontend
+    path('api/finance/', include(router.urls)),
+    path('api/finance/coordonnateur/decaissements/<uuid:decaissement_id>/decision/', DecisionDecaissementView.as_view())
 ]
