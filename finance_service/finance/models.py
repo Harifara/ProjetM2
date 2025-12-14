@@ -41,8 +41,11 @@ class DemandeDecaissement(models.Model):
                 resp.raise_for_status()
                 montant = Decimal(str(resp.json().get("montant", 0)))
                 total += montant
+            except requests.HTTPError as e:
+                print(f"[Finance] Montant RH non récupéré pour {rh_id} (HTTP {resp.status_code})")
             except requests.RequestException as e:
                 print(f"[Finance] Impossible de récupérer le montant RH pour {rh_id}: {e}")
+
 
         # 🔹 Calcul montant des demandes Stock
         for stock_id in getattr(self, 'demandes_stock_ids', []):
