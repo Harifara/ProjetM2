@@ -18,10 +18,10 @@ jobs:
       with:
         ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-    - name: Copy files to EC2
+    - name: Deploy to EC2
       run: |
         ssh -o StrictHostKeyChecking=no ubuntu@51.21.42.34 "
-          cd /home/ubuntu/backend &&
+          cd /home/ubuntu/ProjetM2 &&
           git pull origin main &&
           docker-compose down &&
           docker-compose build &&
