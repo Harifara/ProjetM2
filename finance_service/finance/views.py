@@ -8,6 +8,8 @@ from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
 from .models import DemandeDecaissement, Depense
 from .serializers import DemandeDecaissementSerializer, DepenseSerializer
+import requests
+
 
 
 class DemandeDecaissementViewSet(viewsets.ModelViewSet):
