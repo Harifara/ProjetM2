@@ -37,11 +37,12 @@ class DemandeDecaissement(models.Model):
     # Gestion des montants
     # ------------------------------
     def recalculer_montant_total(self):
-        total = 0
+        total = Decimal("0.00")
 
         token = generate_service_token()
         headers = {"Authorization": f"Bearer {token}"}
 
+        # 🔹 Demandes RH
         for rh_id in self.demandes_rh_ids:
             try:
                 resp = requests.get(
@@ -50,11 +51,12 @@ class DemandeDecaissement(models.Model):
                     timeout=5
                 )
                 resp.raise_for_status()
-                montant = float(resp.json().get("montant_total", 0))
+                montant = Decimal(str(resp.json().get("montant_total", 0)))
                 total += montant
             except requests.RequestException as e:
                 print(f"[Finance] RH indisponible pour {rh_id}: {e}")
 
+        # 🔹 Demandes Stock
         for stock_id in self.demandes_stock_ids:
             try:
                 resp = requests.get(
@@ -63,7 +65,7 @@ class DemandeDecaissement(models.Model):
                     timeout=5
                 )
                 resp.raise_for_status()
-                montant = float(resp.json().get("montant_estime", 0))
+                montant = Decimal(str(resp.json().get("montant_estime", 0)))
                 total += montant
             except requests.RequestException as e:
                 print(f"[Finance] Stock indisponible pour {stock_id}: {e}")
