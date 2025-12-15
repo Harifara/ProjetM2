@@ -97,15 +97,44 @@ class DemandeDecaissement(models.Model):
     # ------------------------------
     def save(self, *args, **kwargs):
         creating = self._state.adding
+
         self.full_clean()
+
         if creating:
             self.recalculer_montant_total()
+
         if not self.reference:
-            now = timezone.now()
-            with transaction.atomic():
-                count = DemandeDecaissement.objects.filter(date_creation__date=now.date()).count() + 1
-                self.reference = f"DEC-{now:%Y%m%d}-{count:03d}"
+            from django.db import IntegrityError
+
+            for _ in range(5):  # retry en cas de collision
+                try:
+                    with transaction.atomic():
+                        today = timezone.now()
+                        prefix = f"DEC-{today:%Y%m%d}"
+
+                        last = (
+                            DemandeDecaissement.objects
+                            .filter(reference__startswith=prefix)
+                            .order_by("-reference")
+                            .first()
+                        )
+
+                        if last:
+                            last_num = int(last.reference.split("-")[-1])
+                            next_num = last_num + 1
+                        else:
+                            next_num = 1
+
+                        self.reference = f"{prefix}-{next_num:03d}"
+                        super().save(*args, **kwargs)
+                    return
+                except IntegrityError:
+                    continue
+
+            raise IntegrityError("Impossible de générer une référence unique")
+
         super().save(*args, **kwargs)
+
 
     # ------------------------------
     # Synchronisation RH / Stock
