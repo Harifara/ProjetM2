@@ -116,7 +116,7 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
 
         # 🔹 Récupérer les demandes RH en "en_attente"
         try:
-            resp = requests.get(f"{settings.RH_SERVICE_URL}/api/demandes/", timeout=5)
+            resp = requests.get(f"{settings.RH_SERVICE_URL}/api/rh/demandes/", timeout=5)
             resp.raise_for_status()
             all_rh = resp.json()
             rh_demandes = [d for d in all_rh if d.get("status") == "en_attente"]
@@ -125,7 +125,7 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
 
         # 🔹 Récupérer les demandes Stock en "en_attente"
         try:
-            resp = requests.get(f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/", timeout=5)
+            resp = requests.get(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/", timeout=5)
             resp.raise_for_status()
             all_stock = resp.json()
             stock_demandes = [d for d in all_stock if d.get("statut") == "en_attente"]
