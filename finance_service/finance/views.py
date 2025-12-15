@@ -81,7 +81,7 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
         # 🔹 Récupérer les demandes RH en attente via query param
         try:
             resp = requests.get(
-                f"{settings.RH_SERVICE_URL}/api/rh/demandes/",
+                f"{settings.RH_SERVICE_URL}/api/rh/demandes",
                 headers=headers,
                 params={"status": "en_attente"},
                 timeout=5
@@ -96,7 +96,7 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
         # 🔹 Récupérer les demandes Stock en attente via query param
         try:
             resp = requests.get(
-                f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/",
+                f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat",
                 headers=headers,
                 params={"statut": "en_attente"},
                 timeout=5
