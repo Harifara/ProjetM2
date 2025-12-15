@@ -40,12 +40,12 @@ class DemandeDecaissementSerializer(serializers.ModelSerializer):
         """
         demandes_rh_ids = validated_data.get("demandes_rh_ids", [])
         demandes_stock_ids = validated_data.get("demandes_stock_ids", [])
-        user_id = validated_data.get("cree_par_id")
+      
         
         decaissement = DemandeDecaissement(
             demandes_rh_ids=demandes_rh_ids,
             demandes_stock_ids=demandes_stock_ids,
-            cree_par_id=user_id
+            
         )
         decaissement.save()
         decaissement.synchroniser_status()
