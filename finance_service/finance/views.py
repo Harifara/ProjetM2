@@ -97,25 +97,21 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
         Récupère toutes les demandes RH et Stock avec le statut 'en_attente'
         qui n'ont pas encore été utilisées dans un décaissement.
         """
-        rh_demandes = []
-        stock_demandes = []
+        rh_demandes, stock_demandes = [], []
         token = get_service_jwt()
         headers = {"Authorization": f"Bearer {token}"}
-
-        # 🔹 Paramètre de filtre
-        rh_params = {"status": "en_attente"}
-        stock_params = {"statut": "en_attente"}
 
         # 🔹 Récupérer les demandes RH en attente
         try:
             resp = requests.get(
                 f"{settings.RH_SERVICE_URL}/api/rh/demandes/",
                 headers=headers,
-                params=rh_params,
+                params={"status": "en_attente"},
                 timeout=5
             )
             resp.raise_for_status()
             rh_demandes = resp.json()
+            print(f"[Finance] RH récupérées: {len(rh_demandes)}")
         except requests.RequestException as e:
             print(f"[Finance] Impossible de récupérer les demandes RH: {e}")
             if hasattr(e.response, "text"):
@@ -126,18 +122,19 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
             resp = requests.get(
                 f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/",
                 headers=headers,
-                params=stock_params,
+                params={"statut": "en_attente"},
                 timeout=5
             )
             resp.raise_for_status()
             stock_demandes = resp.json()
+            print(f"[Finance] Stock récupérées: {len(stock_demandes)}")
         except requests.RequestException as e:
             print(f"[Finance] Impossible de récupérer les demandes Stock: {e}")
             if hasattr(e.response, "text"):
                 print(f"[Finance] Contenu réponse Stock: {e.response.text}")
 
-        # 🔹 Retourne les listes (même si vides)
-        return Response({"rh": rh_demandes or [], "stock": stock_demandes or []})
+        return Response({"rh": rh_demandes, "stock": stock_demandes})
+
 
 
 class DepenseViewSet(viewsets.ModelViewSet):
