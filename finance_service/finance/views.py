@@ -22,8 +22,8 @@ def get_service_jwt():
 
 class DemandeDecaissementViewSet(viewsets.ModelViewSet):
     queryset = DemandeDecaissement.objects.all()
-    serializer_class = DemandeDecaissementSerializer
     permission_classes = [IsAuthenticated]
+    serializer_class = DemandeDecaissementSerializer
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -38,27 +38,15 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
         token = get_service_jwt()
         headers = {"Authorization": f"Bearer {token}"}
         try:
-            # Mettre les demandes associées en "en_decaissement"
             for rh_id in decaissement.demandes_rh_ids:
-                requests.post(
-                    f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/en_decaissement/",
-                    headers=headers,
-                    timeout=5
-                )
+                requests.post(f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/en_decaissement/", headers=headers)
             for stock_id in decaissement.demandes_stock_ids:
-                requests.post(
-                    f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/en_decaissement/",
-                    headers=headers,
-                    timeout=5
-                )
+                requests.post(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/en_decaissement/", headers=headers)
 
             decaissement.soumettre_coordonnateur()
             return Response({"message": "Décaissement soumis au coordonnateur"}, status=status.HTTP_200_OK)
-
         except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except requests.RequestException as e:
-            return Response({"error": f"Erreur service externe: {e}"}, status=status.HTTP_502_BAD_GATEWAY)
 
     @action(detail=True, methods=["post"])
     def appliquer_decision(self, request, pk=None):
@@ -69,72 +57,56 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
         try:
             decaissement.appliquer_decision_coordonnateur(decision)
 
-            # Si approuvé, mettre les demandes RH et Stock en "valide"
             if decision == "approuve":
                 for rh_id in decaissement.demandes_rh_ids:
-                    requests.post(
-                        f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/approve/",
-                        headers=headers,
-                        timeout=5
-                    )
+                    requests.post(f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/approve/", headers=headers)
                 for stock_id in decaissement.demandes_stock_ids:
-                    requests.post(
-                        f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/approve_finance/",
-                        headers=headers,
-                        timeout=5
-                    )
+                    requests.post(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/approve_finance/", headers=headers)
 
             return Response({"statut": decaissement.statut}, status=status.HTTP_200_OK)
-
         except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except requests.RequestException as e:
-            return Response({"error": f"Erreur service externe: {e}"}, status=status.HTTP_502_BAD_GATEWAY)
 
     @action(detail=False, methods=["get"])
     def demandes_disponibles(self, request):
         """
-        Récupère toutes les demandes RH et Stock avec le statut 'en_attente'
+        Récupère toutes les demandes RH et Stock en attente
         qui n'ont pas encore été utilisées dans un décaissement.
         """
-        rh_demandes, stock_demandes = [], []
+        rh_demandes = []
+        stock_demandes = []
         token = get_service_jwt()
         headers = {"Authorization": f"Bearer {token}"}
 
-        # 🔹 Récupérer les demandes RH en attente
+        # 🔹 Récupérer les demandes RH en attente depuis l'endpoint correct
         try:
             resp = requests.get(
-                f"{settings.RH_SERVICE_URL}/api/rh/demandes/",
+                f"{settings.RH_SERVICE_URL}/api/rh/demandes/en_attente/",
                 headers=headers,
-                params={"status": "en_attente"},
                 timeout=5
             )
             resp.raise_for_status()
             rh_demandes = resp.json()
-            print(f"[Finance] RH récupérées: {len(rh_demandes)}")
         except requests.RequestException as e:
             print(f"[Finance] Impossible de récupérer les demandes RH: {e}")
-            if hasattr(e.response, "text"):
-                print(f"[Finance] Contenu réponse RH: {e.response.text}")
+            if hasattr(e.response, 'text'):
+                print(f"[Finance] Contenu réponse RH:\n{e.response.text}")
 
-        # 🔹 Récupérer les demandes Stock en attente
+        # 🔹 Récupérer les demandes Stock en attente depuis l'endpoint correct
         try:
             resp = requests.get(
-                f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/",
+                f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/en_attente/",
                 headers=headers,
-                params={"statut": "en_attente"},
                 timeout=5
             )
             resp.raise_for_status()
             stock_demandes = resp.json()
-            print(f"[Finance] Stock récupérées: {len(stock_demandes)}")
         except requests.RequestException as e:
             print(f"[Finance] Impossible de récupérer les demandes Stock: {e}")
-            if hasattr(e.response, "text"):
-                print(f"[Finance] Contenu réponse Stock: {e.response.text}")
+            if hasattr(e.response, 'text'):
+                print(f"[Finance] Contenu réponse Stock:\n{e.response.text}")
 
         return Response({"rh": rh_demandes, "stock": stock_demandes})
-
 
 
 class DepenseViewSet(viewsets.ModelViewSet):
