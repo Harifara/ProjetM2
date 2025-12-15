@@ -19,8 +19,8 @@ class DemandeDecaissement(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     reference = models.CharField(max_length=30, unique=True, blank=True)
-    demandes_rh_ids = models.JSONField(default=list, null=True, blank=True)
-    demandes_stock_ids = models.JSONField(default=list, null=True, blank=True)
+    demandes_rh_ids = models.JSONField(default=list, blank=True)
+    demandes_stock_ids = models.JSONField(default=list, blank=True)
     montant_total = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal("0.00"))
     statut = models.CharField(max_length=30, choices=STATUT_CHOICES, default='brouillon')
     cree_par_id = models.UUIDField()
