@@ -68,8 +68,6 @@ class DemandeDecaissement(models.Model):
 
         self.montant_total = total
 
-        self.demandes_rh_ids = valid_rh_ids
-        self.demandes_stock_ids = valid_stock_ids
 
     # ------------------------------
     # Vérification des demandes déjà utilisées
