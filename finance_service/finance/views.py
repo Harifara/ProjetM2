@@ -70,7 +70,7 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"])
     def demandes_disponibles(self, request):
         """
-        Récupère toutes les demandes RH et Stock en attente
+        Récupère toutes les demandes RH et Stock avec le statut 'en_attente'
         qui n'ont pas encore été utilisées dans un décaissement.
         """
         rh_demandes = []
@@ -78,33 +78,35 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
         token = get_service_jwt()
         headers = {"Authorization": f"Bearer {token}"}
 
-        # 🔹 Récupérer les demandes RH en attente depuis l'endpoint correct
+        # 🔹 Récupérer les demandes RH en attente via query param
         try:
             resp = requests.get(
-                f"{settings.RH_SERVICE_URL}/api/rh/demandes/en_attente/",
+                f"{settings.RH_SERVICE_URL}/api/rh/demandes/",
                 headers=headers,
+                params={"status": "en_attente"},
                 timeout=5
             )
             resp.raise_for_status()
             rh_demandes = resp.json()
         except requests.RequestException as e:
             print(f"[Finance] Impossible de récupérer les demandes RH: {e}")
-            if hasattr(e.response, 'text'):
-                print(f"[Finance] Contenu réponse RH:\n{e.response.text}")
+            if hasattr(e, 'response') and e.response is not None:
+                print(f"[Finance] Contenu réponse RH: {e.response.text}")
 
-        # 🔹 Récupérer les demandes Stock en attente depuis l'endpoint correct
+        # 🔹 Récupérer les demandes Stock en attente via query param
         try:
             resp = requests.get(
-                f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/en_attente/",
+                f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/",
                 headers=headers,
+                params={"statut": "en_attente"},
                 timeout=5
             )
             resp.raise_for_status()
             stock_demandes = resp.json()
         except requests.RequestException as e:
             print(f"[Finance] Impossible de récupérer les demandes Stock: {e}")
-            if hasattr(e.response, 'text'):
-                print(f"[Finance] Contenu réponse Stock:\n{e.response.text}")
+            if hasattr(e, 'response') and e.response is not None:
+                print(f"[Finance] Contenu réponse Stock: {e.response.text}")
 
         return Response({"rh": rh_demandes, "stock": stock_demandes})
 
