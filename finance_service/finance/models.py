@@ -37,38 +37,37 @@ class DemandeDecaissement(models.Model):
     # ------------------------------
     def recalculer_montant_total(self):
         total = Decimal("0.00")
-        valid_rh_ids = []
-        valid_stock_ids = []
 
-        # 🔹 Montants RH
         for rh_id in self.demandes_rh_ids:
             try:
                 resp = requests.get(
-                    f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/montant_total/",
+                    f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/",
                     timeout=5
                 )
                 resp.raise_for_status()
-                montant = Decimal(str(resp.json().get("montant_total", 0)))
+                montant = Decimal(str(
+                    resp.json().get("montant_total") or 0
+                ))
                 total += montant
-                valid_rh_ids.append(rh_id)
             except requests.RequestException as e:
-                print(f"[Finance] Impossible de récupérer le montant RH pour {rh_id}: {e}")
+                print(f"[Finance] RH indisponible pour {rh_id}: {e}")
 
-        # 🔹 Montants Stock
         for stock_id in self.demandes_stock_ids:
             try:
                 resp = requests.get(
-                    f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/montant_estime/",
+                    f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/",
                     timeout=5
                 )
                 resp.raise_for_status()
-                montant = Decimal(str(resp.json().get("montant_estime", 0)))
+                montant = Decimal(str(
+                    resp.json().get("montant_estime") or 0
+                ))
                 total += montant
-                valid_stock_ids.append(stock_id)
             except requests.RequestException as e:
-                print(f"[Finance] Impossible de récupérer le montant Stock pour {stock_id}: {e}")
+                print(f"[Finance] Stock indisponible pour {stock_id}: {e}")
 
         self.montant_total = total
+
         self.demandes_rh_ids = valid_rh_ids
         self.demandes_stock_ids = valid_stock_ids
 
