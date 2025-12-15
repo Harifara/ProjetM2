@@ -27,7 +27,6 @@ class DemandeDecaissementSerializer(serializers.ModelSerializer):
             "demandes_stock_ids",
             "montant_total",
             "statut",
-            "cree_par_id",
             "date_creation",
             "date_decaissement",
             "depenses",
