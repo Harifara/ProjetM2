@@ -1,4 +1,3 @@
-# finance/views.py
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -32,98 +31,62 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
     def soumettre(self, request, pk=None):
         """
         Soumettre un décaissement au coordonnateur.
-        Met à jour le statut des demandes associées en "en_decaissement".
         """
         decaissement = self.get_object()
-        rh_ids = request.data.get("rh_ids", [])
-        stock_ids = request.data.get("stock_ids", [])
-
         try:
-            # 🔹 Mettre les demandes RH en "en_decaissement"
-            for rh_id in rh_ids:
-                requests.patch(
-                    f"{settings.RH_SERVICE_URL}/api/demandes/{rh_id}/",
-                    json={"status": "en_decaissement"},
-                    timeout=5
-                )
-
-            # 🔹 Mettre les demandes Stock en "en_decaissement"
-            for stock_id in stock_ids:
-                requests.patch(
-                    f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/{stock_id}/",
-                    json={"statut": "en_decaissement"},
-                    timeout=5
-                )
-
             decaissement.soumettre_coordonnateur()
+            # 🔹 Mettre à jour le statut des demandes associées
+            for rh_id in decaissement.demandes_rh_ids:
+                requests.patch(f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/", json={"status": "en_decaissement"})
+            for stock_id in decaissement.demandes_stock_ids:
+                requests.patch(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/", json={"statut": "en_decaissement"})
             return Response(
                 {"message": "Décaissement soumis au coordonnateur"},
                 status=status.HTTP_200_OK,
             )
         except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except requests.RequestException as e:
-            return Response(
-                {"error": f"Impossible de mettre à jour les demandes : {e}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
 
     @action(detail=True, methods=["post"])
     def appliquer_decision(self, request, pk=None):
         """
         Appliquer la décision du coordonnateur.
-        Si approuvé, les demandes associées deviennent "valide".
         """
         decaissement = self.get_object()
         decision = request.data.get("decision")
-        rh_ids = [d.id for d in decaissement.demandes_rh.all()]
-        stock_ids = [d.id for d in decaissement.demandes_stock.all()]
-
         try:
             decaissement.appliquer_decision_coordonnateur(decision)
 
-            if decision == "approuve":
-                # 🔹 Mettre toutes les demandes associées en "valide"
-                for rh_id in rh_ids:
-                    requests.patch(
-                        f"{settings.RH_SERVICE_URL}/api/demandes/{rh_id}/",
-                        json={"status": "valide"},
-                        timeout=5
-                    )
-                for stock_id in stock_ids:
-                    requests.patch(
-                        f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/{stock_id}/",
-                        json={"statut": "valide"},
-                        timeout=5
-                    )
+            # 🔹 Si validé, mettre à jour le statut des demandes RH et Stock
+            if decision == "valide":
+                for rh_id in decaissement.demandes_rh_ids:
+                    requests.patch(f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/", json={"status": "valide"})
+                for stock_id in decaissement.demandes_stock_ids:
+                    requests.patch(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/", json={"statut": "valide"})
 
             return Response({"statut": decaissement.statut}, status=status.HTTP_200_OK)
         except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except requests.RequestException as e:
-            return Response(
-                {"error": f"Impossible de mettre à jour les demandes : {e}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
 
     @action(detail=False, methods=["get"])
     def demandes_disponibles(self, request):
         """
-        Retourne toutes les demandes RH et Stock qui sont en attente pour créer un décaissement.
+        Retourne toutes les demandes RH et Stock disponibles pour créer un décaissement.
         """
         rh_demandes = []
         stock_demandes = []
 
-        # 🔹 Récupérer les demandes RH en "en_attente"
+        # 🔹 RH
         try:
             resp = requests.get(f"{settings.RH_SERVICE_URL}/api/rh/demandes/", timeout=5)
             resp.raise_for_status()
             all_rh = resp.json()
+            # On ne prend que les demandes en attente
             rh_demandes = [d for d in all_rh if d.get("status") == "en_attente"]
         except requests.RequestException as e:
             print(f"[Finance] Impossible de récupérer les demandes RH: {e}")
 
-        # 🔹 Récupérer les demandes Stock en "en_attente"
+        # 🔹 Stock
         try:
             resp = requests.get(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/", timeout=5)
             resp.raise_for_status()
