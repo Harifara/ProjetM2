@@ -74,6 +74,10 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def demandes_disponibles(self, request):
+        """
+        Récupère toutes les demandes RH et Stock avec le statut 'en_attente'
+        qui n'ont pas encore été utilisées dans un décaissement.
+        """
         rh_demandes = []
         stock_demandes = []
         token = get_service_jwt()
@@ -81,7 +85,11 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
 
         # 🔹 Récupérer les demandes RH en attente
         try:
-            resp = requests.get(f"{settings.RH_SERVICE_URL}/api/rh/demandes", headers=headers, timeout=5)
+            resp = requests.get(
+                f"{settings.RH_SERVICE_URL}/api/rh/demandes?status=en_attente",
+                headers=headers,
+                timeout=5
+            )
             resp.raise_for_status()
             rh_demandes = resp.json()
         except requests.RequestException as e:
@@ -89,7 +97,11 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
 
         # 🔹 Récupérer les demandes Stock en attente
         try:
-            resp = requests.get(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat", headers=headers, timeout=5)
+            resp = requests.get(
+                f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat?statut=en_attente",
+                headers=headers,
+                timeout=5
+            )
             resp.raise_for_status()
             stock_demandes = resp.json()
         except requests.RequestException as e:
