@@ -1,3 +1,4 @@
+# finance/views.py
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -7,7 +8,6 @@ from .models import DemandeDecaissement, Depense
 from .serializers import DemandeDecaissementSerializer, DepenseSerializer
 import requests
 from django.conf import settings
-
 
 class DemandeDecaissementViewSet(viewsets.ModelViewSet):
     """
@@ -34,12 +34,13 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
         """
         decaissement = self.get_object()
         try:
-            decaissement.soumettre_coordonnateur()
-            # 🔹 Mettre à jour le statut des demandes associées
+            # Mettre les demandes associées en 'en_decaissement'
             for rh_id in decaissement.demandes_rh_ids:
-                requests.patch(f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/", json={"status": "en_decaissement"})
+                requests.post(f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/en_decaissement/")
             for stock_id in decaissement.demandes_stock_ids:
-                requests.patch(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/", json={"statut": "en_decaissement"})
+                requests.post(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/en_decaissement/")
+
+            decaissement.soumettre_coordonnateur()
             return Response(
                 {"message": "Décaissement soumis au coordonnateur"},
                 status=status.HTTP_200_OK,
@@ -57,12 +58,12 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
         try:
             decaissement.appliquer_decision_coordonnateur(decision)
 
-            # 🔹 Si validé, mettre à jour le statut des demandes RH et Stock
-            if decision == "valide":
+            # Si approuvé, mettre les demandes RH et Stock en 'valide'
+            if decision == "approuve":
                 for rh_id in decaissement.demandes_rh_ids:
-                    requests.patch(f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/", json={"status": "valide"})
+                    requests.post(f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/approve/")
                 for stock_id in decaissement.demandes_stock_ids:
-                    requests.patch(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/", json={"statut": "valide"})
+                    requests.post(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/approve_finance/")
 
             return Response({"statut": decaissement.statut}, status=status.HTTP_200_OK)
         except ValidationError as e:
@@ -76,22 +77,19 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
         rh_demandes = []
         stock_demandes = []
 
-        # 🔹 RH
+        # 🔹 Récupérer les demandes RH en attente
         try:
-            resp = requests.get(f"{settings.RH_SERVICE_URL}/api/rh/demandes/", timeout=5)
+            resp = requests.get(f"{settings.RH_SERVICE_URL}/api/rh/demandes/?status=en_attente", timeout=5)
             resp.raise_for_status()
-            all_rh = resp.json()
-            # On ne prend que les demandes en attente
-            rh_demandes = [d for d in all_rh if d.get("status") == "en_attente"]
+            rh_demandes = resp.json()
         except requests.RequestException as e:
             print(f"[Finance] Impossible de récupérer les demandes RH: {e}")
 
-        # 🔹 Stock
+        # 🔹 Récupérer les demandes Stock en attente
         try:
-            resp = requests.get(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/", timeout=5)
+            resp = requests.get(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/?statut=en_attente", timeout=5)
             resp.raise_for_status()
-            all_stock = resp.json()
-            stock_demandes = [d for d in all_stock if d.get("statut") == "en_attente"]
+            stock_demandes = resp.json()
         except requests.RequestException as e:
             print(f"[Finance] Impossible de récupérer les demandes Stock: {e}")
 
