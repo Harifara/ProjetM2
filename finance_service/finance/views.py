@@ -9,18 +9,22 @@ from .serializers import DemandeDecaissementSerializer, DepenseSerializer
 import requests
 from django.conf import settings
 
+# 🔹 Générer un JWT pour les requêtes inter-services
+import jwt
+def get_service_jwt():
+    payload = {
+        "iss": "finance-service",
+        "sub": "finance",
+    }
+    token = jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    return token
+
 class DemandeDecaissementViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet pour gérer les demandes de décaissement.
-    """
     queryset = DemandeDecaissement.objects.all()
     permission_classes = [IsAuthenticated]
     serializer_class = DemandeDecaissementSerializer
 
     def get_queryset(self):
-        """
-        Filtre les demandes non encore décaisées si on est dans la liste "demandes reçues".
-        """
         queryset = super().get_queryset()
         en_reception = self.request.query_params.get("en_reception")
         if en_reception == "true":
@@ -29,16 +33,15 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def soumettre(self, request, pk=None):
-        """
-        Soumettre un décaissement au coordonnateur.
-        """
         decaissement = self.get_object()
+        token = get_service_jwt()
+        headers = {"Authorization": f"Bearer {token}"}
         try:
             # Mettre les demandes associées en 'en_decaissement'
             for rh_id in decaissement.demandes_rh_ids:
-                requests.post(f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/en_decaissement/")
+                requests.post(f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/en_decaissement/", headers=headers)
             for stock_id in decaissement.demandes_stock_ids:
-                requests.post(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/en_decaissement/")
+                requests.post(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/en_decaissement/", headers=headers)
 
             decaissement.soumettre_coordonnateur()
             return Response(
@@ -50,20 +53,19 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def appliquer_decision(self, request, pk=None):
-        """
-        Appliquer la décision du coordonnateur.
-        """
         decaissement = self.get_object()
         decision = request.data.get("decision")
+        token = get_service_jwt()
+        headers = {"Authorization": f"Bearer {token}"}
         try:
             decaissement.appliquer_decision_coordonnateur(decision)
 
             # Si approuvé, mettre les demandes RH et Stock en 'valide'
             if decision == "approuve":
                 for rh_id in decaissement.demandes_rh_ids:
-                    requests.post(f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/approve/")
+                    requests.post(f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/approve/", headers=headers)
                 for stock_id in decaissement.demandes_stock_ids:
-                    requests.post(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/approve_finance/")
+                    requests.post(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/approve_finance/", headers=headers)
 
             return Response({"statut": decaissement.statut}, status=status.HTTP_200_OK)
         except ValidationError as e:
@@ -71,15 +73,14 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def demandes_disponibles(self, request):
-        """
-        Retourne toutes les demandes RH et Stock disponibles pour créer un décaissement.
-        """
         rh_demandes = []
         stock_demandes = []
+        token = get_service_jwt()
+        headers = {"Authorization": f"Bearer {token}"}
 
         # 🔹 Récupérer les demandes RH en attente
         try:
-            resp = requests.get(f"{settings.RH_SERVICE_URL}/api/rh/demandes/?status=en_attente", timeout=5)
+            resp = requests.get(f"{settings.RH_SERVICE_URL}/api/rh/demandes/?status=en_attente", headers=headers, timeout=5)
             resp.raise_for_status()
             rh_demandes = resp.json()
         except requests.RequestException as e:
@@ -87,7 +88,7 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
 
         # 🔹 Récupérer les demandes Stock en attente
         try:
-            resp = requests.get(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/?statut=en_attente", timeout=5)
+            resp = requests.get(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/?statut=en_attente", headers=headers, timeout=5)
             resp.raise_for_status()
             stock_demandes = resp.json()
         except requests.RequestException as e:
@@ -97,9 +98,6 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
 
 
 class DepenseViewSet(viewsets.ModelViewSet):
-    """
-    Gestion des dépenses liées à un décaissement.
-    """
     queryset = Depense.objects.all()
     serializer_class = DepenseSerializer
     permission_classes = [IsAuthenticated]
