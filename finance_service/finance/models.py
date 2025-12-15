@@ -44,11 +44,11 @@ class DemandeDecaissement(models.Model):
         for rh_id in self.demandes_rh_ids:
             try:
                 resp = requests.get(
-                    f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/montant/",
+                    f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/montant_total/",
                     timeout=5
                 )
                 resp.raise_for_status()
-                montant = Decimal(str(resp.json().get("montant", 0)))
+                montant = Decimal(str(resp.json().get("montant_total", 0)))
                 total += montant
                 valid_rh_ids.append(rh_id)
             except requests.RequestException as e:
@@ -58,11 +58,11 @@ class DemandeDecaissement(models.Model):
         for stock_id in self.demandes_stock_ids:
             try:
                 resp = requests.get(
-                    f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/montant/",
+                    f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/montant_estime/",
                     timeout=5
                 )
                 resp.raise_for_status()
-                montant = Decimal(str(resp.json().get("montant", 0)))
+                montant = Decimal(str(resp.json().get("montant_estime", 0)))
                 total += montant
                 valid_stock_ids.append(stock_id)
             except requests.RequestException as e:
