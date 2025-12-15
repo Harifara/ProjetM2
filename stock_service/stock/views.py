@@ -287,16 +287,36 @@ class TransfertStockViewSet(viewsets.ModelViewSet):
 # DemandeAchat
 # =========================
 class DemandeAchatViewSet(viewsets.ModelViewSet):
-    queryset = DemandeAchat.objects.all()
+    """
+    ViewSet pour gérer les demandes d'achat Stock
+    - Permet au finance de récupérer les demandes
+    - Permet au magasinier de marquer la réception
+    """
     serializer_class = DemandeAchatSerializer
+    queryset = DemandeAchat.objects.all()
+
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['statut', 'statut_reception']
     search_fields = ['numero', 'justification']
     ordering_fields = ['created_at', 'montant_estime']
     ordering = ['-created_at']
 
+    def get_queryset(self):
+        """
+        Retourne toutes les demandes.
+        Filtre facultatif par statut via query param.
+        """
+        qs = self.queryset
+        statut_param = self.request.query_params.get('statut', None)
+        if statut_param:
+            qs = qs.filter(statut=statut_param)
+        return qs
+
     @action(detail=True, methods=['post'])
     def enregistrer_reception(self, request, pk=None):
-        """Marquer la demande comme réceptionnée par le magasinier"""
+        """
+        Marquer la demande comme réceptionnée par le magasinier
+        """
         demande = self.get_object()
         magasin_id = request.data.get('magasin_id')
         if not magasin_id:
@@ -304,6 +324,43 @@ class DemandeAchatViewSet(viewsets.ModelViewSet):
 
         try:
             demande.enregistrer_reception(uuid.UUID(magasin_id))
+        except ValidationError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = self.get_serializer(demande)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def approve_finance(self, request, pk=None):
+        """
+        Valider la demande côté finance (statut = 'valide')
+        """
+        demande = self.get_object()
+        finance_user_id = request.data.get('finance_user_id')
+        if not finance_user_id:
+            return Response({"detail": "finance_user_id requis"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            demande.valider_finance(uuid.UUID(finance_user_id))
+        except ValidationError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = self.get_serializer(demande)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def reject_finance(self, request, pk=None):
+        """
+        Rejeter la demande côté finance (statut = 'rejete')
+        """
+        demande = self.get_object()
+        finance_user_id = request.data.get('finance_user_id')
+        commentaire = request.data.get('commentaire', '')
+        if not finance_user_id:
+            return Response({"detail": "finance_user_id requis"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            demande.rejeter_finance(uuid.UUID(finance_user_id), commentaire)
         except ValidationError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 

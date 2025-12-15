@@ -327,8 +327,8 @@ class DemandeViewSet(viewsets.ModelViewSet):
     - Affiche toutes les demandes
     - Permet d'approuver ou de refuser une demande
     """
-    queryset = Demande.objects.prefetch_related('achats', 'payements').all()
     serializer_class = DemandeSerializer
+    queryset = Demande.objects.prefetch_related('achats', 'payements').all()
 
     # Filtres, recherche et tri
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -339,9 +339,15 @@ class DemandeViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        Optionnel : filtrer automatiquement pour exclure les demandes déjà en décaissement
+        Retourne toutes les demandes.
+        Si un paramètre 'status' est fourni, filtre dessus.
+        Exclut les demandes en_decaissement seulement si pas demandé explicitement.
         """
-        return self.queryset.exclude(status='en_decaissement')
+        qs = self.queryset
+        status_param = self.request.query_params.get('status', None)
+        if status_param:
+            qs = qs.filter(status=status_param)
+        return qs
 
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
