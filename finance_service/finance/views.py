@@ -8,10 +8,9 @@ from .models import DemandeDecaissement, Depense
 from .serializers import DemandeDecaissementSerializer, DepenseSerializer
 import requests
 from django.conf import settings
-
+import jwt
 
 # 🔹 Générer un JWT pour les requêtes inter-services
-import jwt
 def get_service_jwt():
     payload = {
         "iss": "finance-service",
@@ -20,10 +19,11 @@ def get_service_jwt():
     token = jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
     return token
 
+
 class DemandeDecaissementViewSet(viewsets.ModelViewSet):
     queryset = DemandeDecaissement.objects.all()
-    permission_classes = [IsAuthenticated]
     serializer_class = DemandeDecaissementSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -38,19 +38,27 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
         token = get_service_jwt()
         headers = {"Authorization": f"Bearer {token}"}
         try:
-            # Mettre les demandes associées en 'en_decaissement'
+            # Mettre les demandes associées en "en_decaissement"
             for rh_id in decaissement.demandes_rh_ids:
-                requests.post(f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/en_decaissement/", headers=headers)
+                requests.post(
+                    f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/en_decaissement/",
+                    headers=headers,
+                    timeout=5
+                )
             for stock_id in decaissement.demandes_stock_ids:
-                requests.post(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/en_decaissement/", headers=headers)
+                requests.post(
+                    f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/en_decaissement/",
+                    headers=headers,
+                    timeout=5
+                )
 
             decaissement.soumettre_coordonnateur()
-            return Response(
-                {"message": "Décaissement soumis au coordonnateur"},
-                status=status.HTTP_200_OK,
-            )
+            return Response({"message": "Décaissement soumis au coordonnateur"}, status=status.HTTP_200_OK)
+
         except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except requests.RequestException as e:
+            return Response({"error": f"Erreur service externe: {e}"}, status=status.HTTP_502_BAD_GATEWAY)
 
     @action(detail=True, methods=["post"])
     def appliquer_decision(self, request, pk=None):
@@ -61,16 +69,27 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
         try:
             decaissement.appliquer_decision_coordonnateur(decision)
 
-            # Si approuvé, mettre les demandes RH et Stock en 'valide'
+            # Si approuvé, mettre les demandes RH et Stock en "valide"
             if decision == "approuve":
                 for rh_id in decaissement.demandes_rh_ids:
-                    requests.post(f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/approve/", headers=headers)
+                    requests.post(
+                        f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/approve/",
+                        headers=headers,
+                        timeout=5
+                    )
                 for stock_id in decaissement.demandes_stock_ids:
-                    requests.post(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/approve_finance/", headers=headers)
+                    requests.post(
+                        f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/approve_finance/",
+                        headers=headers,
+                        timeout=5
+                    )
 
             return Response({"statut": decaissement.statut}, status=status.HTTP_200_OK)
+
         except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except requests.RequestException as e:
+            return Response({"error": f"Erreur service externe: {e}"}, status=status.HTTP_502_BAD_GATEWAY)
 
     @action(detail=False, methods=["get"])
     def demandes_disponibles(self, request):
@@ -86,7 +105,8 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
         # 🔹 Récupérer les demandes RH en attente
         try:
             resp = requests.get(
-                f"{settings.RH_SERVICE_URL}/api/rh/demandes?status=en_attente",
+                f"{settings.RH_SERVICE_URL}/api/rh/demandes/",
+                params={"status": "en_attente"},
                 headers=headers,
                 timeout=5
             )
@@ -98,7 +118,8 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
         # 🔹 Récupérer les demandes Stock en attente
         try:
             resp = requests.get(
-                f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat?statut=en_attente",
+                f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/",
+                params={"statut": "en_attente"},
                 headers=headers,
                 timeout=5
             )
