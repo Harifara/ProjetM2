@@ -147,31 +147,32 @@ class DemandeDecaissement(models.Model):
         'decaisse': 'decaisse',
     }
 
-    mapped_status = status_map.get(self.statut, 'en_decaissement')
-    token = generate_service_token()
-    headers = {"Authorization": f"Bearer {token}"}
+        mapped_status = status_map.get(self.statut, 'en_decaissement')
 
-    for rh_id in self.demandes_rh_ids:
-        try:
-            requests.post(
-                f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/update-status/",
-                json={"status": mapped_status},
-                headers=headers,
-                timeout=5
-            )
-        except requests.RequestException as e:
-            print(f"[Finance] Impossible de synchroniser RH {rh_id}: {e}")
+        token = generate_service_token()
+        headers = {"Authorization": f"Bearer {token}"}
 
-    for stock_id in self.demandes_stock_ids:
-        try:
-            requests.post(
-                f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/update-status/",
-                json={"statut": mapped_status},
-                headers=headers,
-                timeout=5
-            )
-        except requests.RequestException as e:
-            print(f"[Finance] Impossible de synchroniser Stock {stock_id}: {e}")
+        for rh_id in self.demandes_rh_ids:
+            try:
+                requests.post(
+                    f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/update-status/",
+                    json={"status": mapped_status},
+                    headers=headers,
+                    timeout=5
+                )
+            except requests.RequestException as e:
+                print(f"[Finance] Impossible de synchroniser RH {rh_id}: {e}")
+
+        for stock_id in self.demandes_stock_ids:
+            try:
+                requests.post(
+                    f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/update-status/",
+                    json={"statut": mapped_status},
+                    headers=headers,
+                    timeout=5
+                )
+            except requests.RequestException as e:
+                print(f"[Finance] Impossible de synchroniser Stock {stock_id}: {e}")
 
 
     # ------------------------------
