@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.conf import settings
 import requests
+from .utils import generate_service_token
 
 
 class DemandeDecaissement(models.Model):
@@ -36,18 +37,20 @@ class DemandeDecaissement(models.Model):
     # Gestion des montants
     # ------------------------------
     def recalculer_montant_total(self):
-        total = Decimal("0.00")
+        total = 0
+
+        token = generate_service_token()
+        headers = {"Authorization": f"Bearer {token}"}
 
         for rh_id in self.demandes_rh_ids:
             try:
                 resp = requests.get(
                     f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/",
+                    headers=headers,
                     timeout=5
                 )
                 resp.raise_for_status()
-                montant = Decimal(str(
-                    resp.json().get("montant_total") or 0
-                ))
+                montant = float(resp.json().get("montant_total", 0))
                 total += montant
             except requests.RequestException as e:
                 print(f"[Finance] RH indisponible pour {rh_id}: {e}")
@@ -56,12 +59,11 @@ class DemandeDecaissement(models.Model):
             try:
                 resp = requests.get(
                     f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/",
+                    headers=headers,
                     timeout=5
                 )
                 resp.raise_for_status()
-                montant = Decimal(str(
-                    resp.json().get("montant_estime") or 0
-                ))
+                montant = float(resp.json().get("montant_estime", 0))
                 total += montant
             except requests.RequestException as e:
                 print(f"[Finance] Stock indisponible pour {stock_id}: {e}")
@@ -138,34 +140,39 @@ class DemandeDecaissement(models.Model):
     # ------------------------------
     def synchroniser_status(self):
         status_map = {
-            'brouillon': 'en_decaissement',
-            'en_attente_coordonnateur': 'en_decaissement',
-            'approuve': 'valide',
-            'rejete': 'refuse',
-            'decaisse': 'decaisse',
-        }
+        'brouillon': 'en_decaissement',
+        'en_attente_coordonnateur': 'en_decaissement',
+        'approuve': 'valide',
+        'rejete': 'refuse',
+        'decaisse': 'decaisse',
+    }
 
-        mapped_status = status_map.get(self.statut, 'en_decaissement')
+    mapped_status = status_map.get(self.statut, 'en_decaissement')
+    token = generate_service_token()
+    headers = {"Authorization": f"Bearer {token}"}
 
-        for rh_id in self.demandes_rh_ids:
-            try:
-                requests.post(
-                    f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/update-status/",
-                    json={"status": mapped_status},
-                    timeout=5
-                )
-            except requests.RequestException as e:
-                print(f"[Finance] Impossible de synchroniser RH {rh_id}: {e}")
+    for rh_id in self.demandes_rh_ids:
+        try:
+            requests.post(
+                f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/update-status/",
+                json={"status": mapped_status},
+                headers=headers,
+                timeout=5
+            )
+        except requests.RequestException as e:
+            print(f"[Finance] Impossible de synchroniser RH {rh_id}: {e}")
 
-        for stock_id in self.demandes_stock_ids:
-            try:
-                requests.post(
-                    f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/update-status/",
-                    json={"statut": mapped_status},
-                    timeout=5
-                )
-            except requests.RequestException as e:
-                print(f"[Finance] Impossible de synchroniser Stock {stock_id}: {e}")
+    for stock_id in self.demandes_stock_ids:
+        try:
+            requests.post(
+                f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/update-status/",
+                json={"statut": mapped_status},
+                headers=headers,
+                timeout=5
+            )
+        except requests.RequestException as e:
+            print(f"[Finance] Impossible de synchroniser Stock {stock_id}: {e}")
+
 
     # ------------------------------
     # Actions
