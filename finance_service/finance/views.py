@@ -102,25 +102,42 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
         token = get_service_jwt()
         headers = {"Authorization": f"Bearer {token}"}
 
+        # 🔹 Paramètre de filtre
+        rh_params = {"status": "en_attente"}
+        stock_params = {"statut": "en_attente"}
+
         # 🔹 Récupérer les demandes RH en attente
         try:
-            resp = requests.get(f"{settings.RH_SERVICE_URL}/api/rh/demandes/", headers=headers)
-            print(resp.text)
+            resp = requests.get(
+                f"{settings.RH_SERVICE_URL}/api/rh/demandes/",
+                headers=headers,
+                params=rh_params,
+                timeout=5
+            )
             resp.raise_for_status()
             rh_demandes = resp.json()
         except requests.RequestException as e:
             print(f"[Finance] Impossible de récupérer les demandes RH: {e}")
+            if hasattr(e.response, "text"):
+                print(f"[Finance] Contenu réponse RH: {e.response.text}")
 
         # 🔹 Récupérer les demandes Stock en attente
         try:
-            resp = requests.get(f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/", headers=headers)
-            print(resp.text)
+            resp = requests.get(
+                f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/",
+                headers=headers,
+                params=stock_params,
+                timeout=5
+            )
             resp.raise_for_status()
             stock_demandes = resp.json()
         except requests.RequestException as e:
             print(f"[Finance] Impossible de récupérer les demandes Stock: {e}")
+            if hasattr(e.response, "text"):
+                print(f"[Finance] Contenu réponse Stock: {e.response.text}")
 
-        return Response({"rh": rh_demandes, "stock": stock_demandes})
+        # 🔹 Retourne les listes (même si vides)
+        return Response({"rh": rh_demandes or [], "stock": stock_demandes or []})
 
 
 class DepenseViewSet(viewsets.ModelViewSet):
