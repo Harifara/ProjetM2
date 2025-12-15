@@ -8,5 +8,5 @@ router.register(r'decaissements', DemandeDecaissementViewSet, basename='decaisse
 router.register(r'depenses', DepenseViewSet, basename='depenses')
 
 urlpatterns = [
-    path('api/finance/', include(router.urls)),
+    path('', include(router.urls)),
 ]
