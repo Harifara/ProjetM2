@@ -44,7 +44,7 @@ class DemandeDecaissement(models.Model):
         for rh_id in self.demandes_rh_ids:
             try:
                 resp = requests.get(
-                    f"{settings.RH_SERVICE_URL}/api/demandes/{rh_id}/montant/",
+                    f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/montant/",
                     timeout=5
                 )
                 resp.raise_for_status()
@@ -58,7 +58,7 @@ class DemandeDecaissement(models.Model):
         for stock_id in self.demandes_stock_ids:
             try:
                 resp = requests.get(
-                    f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/{stock_id}/montant/",
+                    f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/montant/",
                     timeout=5
                 )
                 resp.raise_for_status()
@@ -124,7 +124,7 @@ class DemandeDecaissement(models.Model):
         for rh_id in self.demandes_rh_ids:
             try:
                 requests.post(
-                    f"{settings.RH_SERVICE_URL}/api/demandes/{rh_id}/update-status/",
+                    f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/update-status/",
                     json={"status": mapped_status},
                     timeout=5
                 )
@@ -134,7 +134,7 @@ class DemandeDecaissement(models.Model):
         for stock_id in self.demandes_stock_ids:
             try:
                 requests.post(
-                    f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/{stock_id}/update-status/",
+                    f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/update-status/",
                     json={"statut": mapped_status},
                     timeout=5
                 )
