@@ -88,8 +88,8 @@ services:
         paths: ["/media"]
         strip_path: false
         preserve_host: true
-        # hosts:
-        #   - api.ecartmada.com
+        hosts:
+          - api.ecartmada.com
     plugins:
       - name: cors
         config:
