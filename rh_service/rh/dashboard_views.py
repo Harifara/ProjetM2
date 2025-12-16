@@ -1,3 +1,17 @@
+from datetime import timedelta
+from django.utils import timezone
+from django.db.models import Count, Sum
+from django.db.models.functions import TruncMonth
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+# tes imports models et serializers
+from .models import Employer, Conge, Contrat, Affectation, Demande, Achat, Payement
+from .serializers import EmployerSerializer, CongeSerializer, ContratSerializer, AffectationSerializer, DemandeSerializer
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def dashboard_rh(request):
