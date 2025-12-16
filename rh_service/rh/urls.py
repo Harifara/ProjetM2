@@ -8,6 +8,7 @@ from .views import (
     ModePayementViewSet, DemandeViewSet, PayementViewSet,
     TypeAchatViewSet, AchatViewSet
 )
+from .dashboard_views import dashboard_rh
 
 router = DefaultRouter()
 
@@ -31,4 +32,5 @@ router.register(r'achats', AchatViewSet, basename='achat')
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('dashboard-rh/', dashboard_rh, name='dashboard-rh'),
 ]
