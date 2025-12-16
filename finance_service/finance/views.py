@@ -1,113 +1,128 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.core.exceptions import ValidationError
-from .models import DemandeDecaissement, Depense
-from .serializers import DemandeDecaissementSerializer, DepenseSerializer
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 import requests
 from django.conf import settings
-import jwt
 
+from .models import DemandeDecaissement, Depense
+from .serializers import (
+    DepenseSerializer,
+    DemandeDecaissementListSerializer,
+    DemandeDecaissementDetailSerializer,
+    DemandeDecaissementCreateSerializer,
+    SoumettreCoordonnateurSerializer,
+)
 
-# 🔹 Générer un JWT pour les requêtes inter-services
-def get_service_jwt():
-    payload = {
-        "iss": "finance-service",
-        "sub": "finance",
-    }
-    token = jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
-    return token
 
 
 class DemandeDecaissementViewSet(viewsets.ModelViewSet):
     queryset = DemandeDecaissement.objects.all()
     permission_classes = [IsAuthenticated]
-    serializer_class = DemandeDecaissementSerializer
 
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        en_reception = self.request.query_params.get("en_reception")
-        if en_reception == "true":
-            queryset = queryset.exclude(statut="decaisse")
-        return queryset
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return DemandeDecaissementListSerializer
+        if self.action == 'retrieve':
+            return DemandeDecaissementDetailSerializer
+        if self.action == 'create':
+            return DemandeDecaissementCreateSerializer
+        if self.action == 'soumettre_coordonnateur':
+            return SoumettreCoordonnateurSerializer
+        return DemandeDecaissementDetailSerializer
 
-    @action(detail=True, methods=["post"])
-    def soumettre(self, request, pk=None):
+    @action(detail=True, methods=['post'], url_path='soumettre')
+    def soumettre_coordonnateur(self, request, pk=None):
         decaissement = self.get_object()
-        try:
-            decaissement.soumettre_coordonnateur()
-            return Response({"message": "Décaissement soumis au coordonnateur"}, status=status.HTTP_200_OK)
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=["post"])
-    def appliquer_decision(self, request, pk=None):
-        decaissement = self.get_object()
-        decision = request.data.get("decision")
-        if decision not in ["approuve", "rejete"]:
-            return Response({"error": "Décision invalide"}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            decaissement.appliquer_decision_coordonnateur(decision)
-            return Response({"statut": decaissement.statut}, status=status.HTTP_200_OK)
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = SoumettreCoordonnateurSerializer(
+            decaissement, data={}, context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
 
-    @action(detail=False, methods=["get"])
-    def demandes_disponibles(self, request):
-        """
-        Récupère toutes les demandes RH et Stock avec le statut 'en_attente'
-        qui ne sont pas déjà utilisées dans un décaissement.
-        """
-        rh_demandes, stock_demandes = [], []
-        token = get_service_jwt()
-        headers = {"Authorization": f"Bearer {token}"}
+        return Response(
+            {"message": "Demande soumise au coordonnateur."},
+            status=status.HTTP_200_OK
+        )
 
-        # 🔹 Demandes RH
+        
+class DemandesDisponiblesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        rh_used, stock_used = DemandeDecaissement.get_demandes_deja_utilisees()
+
         try:
-            resp = requests.get(
-                f"{settings.RH_SERVICE_URL}/api/rh/demandes/",
-                headers=headers,
-                params={"status": "en_attente"},
+            resp_rh = requests.get(
+                f"{settings.RH_SERVICE_URL}/api/demandes/?status__in=en_attente,en_cours,approuve",
                 timeout=5
             )
-            resp.raise_for_status()
-            rh_demandes = resp.json()
-        except requests.RequestException as e:
-            print(f"[Finance] Impossible de récupérer les demandes RH: {e}")
-            if hasattr(e, 'response') and e.response is not None:
-                print(f"[Finance] Contenu réponse RH: {e.response.text}")
+            resp_rh.raise_for_status()
+            rh_all = resp_rh.json()
+        except requests.RequestException:
+            rh_all = []
 
-        # 🔹 Demandes Stock
+        rh_available = [d for d in rh_all if d['id'] not in rh_used]
+
         try:
-            resp = requests.get(
-                f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/",
-                headers=headers,
-                params={"statut": "en_attente"},
+            resp_stock = requests.get(
+                f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/?statut__in=en_attente,approuve",
                 timeout=5
             )
-            resp.raise_for_status()
-            stock_demandes = resp.json()
-        except requests.RequestException as e:
-            print(f"[Finance] Impossible de récupérer les demandes Stock: {e}")
-            if hasattr(e, 'response') and e.response is not None:
-                print(f"[Finance] Contenu réponse Stock: {e.response.text}")
+            resp_stock.raise_for_status()
+            stock_all = resp_stock.json()
+        except requests.RequestException:
+            stock_all = []
 
-        # 🔹 Filtrer les demandes déjà utilisées
-        rh_ids_utilises, stock_ids_utilises = DemandeDecaissement.get_demandes_deja_utilisees()
-        rh_demandes = [d for d in rh_demandes if d["id"] not in rh_ids_utilises]
-        stock_demandes = [d for d in stock_demandes if d["id"] not in stock_ids_utilises]
+        stock_available = [d for d in stock_all if d['id'] not in stock_used]
 
-        return Response({"rh": rh_demandes, "stock": stock_demandes})
+        return Response({
+            "rh": rh_available,
+            "stock": stock_available
+        })
 
+
+
+class DecisionDecaissementView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, decaissement_id):
+        decision = request.data.get('decision')
+
+        try:
+            decaissement = DemandeDecaissement.objects.get(id=decaissement_id)
+        except DemandeDecaissement.DoesNotExist:
+            return Response(
+                {"detail": "Décaissement introuvable"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if decaissement.statut != 'en_attente_coordonnateur':
+            return Response(
+                {"detail": "Décaissement déjà traité"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if decision == 'approuve':
+            decaissement.approuver()
+        elif decision == 'rejete':
+            decaissement.rejeter()
+        else:
+            return Response(
+                {"detail": "Décision invalide"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response(
+            {"statut": decaissement.statut},
+            status=status.HTTP_200_OK
+        )
 
 class DepenseViewSet(viewsets.ModelViewSet):
     queryset = Depense.objects.all()
     serializer_class = DepenseSerializer
     permission_classes = [IsAuthenticated]
 
-    def perform_create(self, serializer):
-        decaissement = serializer.validated_data["decaissement"]
-        if decaissement.statut != "approuve":
-            raise ValidationError("Décaissement non approuvé")
-        serializer.save()
+
