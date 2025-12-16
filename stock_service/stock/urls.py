@@ -14,6 +14,7 @@ from .views import (
     DemandeAchatViewSet,
     ajouter_stock, retirer_stock  # endpoint personnalisé
 )
+from .dashboard_views import dashboard_stock
 
 router = DefaultRouter()
 router.register(r'categories', CategorieViewSet, basename='categorie')
@@ -24,6 +25,7 @@ router.register(r'mouvements-stock', MouvementStockViewSet, basename='mouvement-
 router.register(r'demandes-reapprovisionnement', DemandeReapprovisionnementViewSet, basename='demande-reappro')
 router.register(r'demandes-achat', DemandeAchatViewSet, basename='demande-achat')
 router.register(r'transferts-stock', TransfertStockViewSet, basename='transfert-stock')
+router.register(r'dashboard-stock/', dashboard_stock, basename='dashboard_stock')
 
 
 urlpatterns = [
@@ -32,3 +34,5 @@ urlpatterns = [
     path('stocks/<uuid:stock_id>/ajouter/', ajouter_stock, name='ajouter-stock'),
     path('stocks/<uuid:stock_id>/retirer/', retirer_stock, name='retirer-stock'),
 ]
+
+
