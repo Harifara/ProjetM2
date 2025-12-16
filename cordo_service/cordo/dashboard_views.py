@@ -3,14 +3,15 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from cordo.models import ValidationCoordonnateur
 from .serializers import ValidationCoordonnateurSerializer
+import requests
+from django.conf import settings
 
 @api_view(['GET'])
 def dashboard_coordonnateur(request):
     """
     Retourne les données pour le dashboard du coordonnateur :
     - KPI : total, approuvés, rejetés, en attente
-    - Décaissements validés
-    - Décaissements en attente de validation
+    - Décaissements validés et en attente via l'API Finance
     """
     # 🔹 Toutes les validations existantes
     validations = ValidationCoordonnateur.objects.all()
@@ -21,23 +22,23 @@ def dashboard_coordonnateur(request):
     approuvees = validations.filter(decision='approuve').count()
     rejetees = validations.filter(decision='rejete').count()
 
-    # 🔹 Décaissements en attente : ceux qui n'ont pas de validation
-    validated_ids = validations.values_list('demande_decaissement_id', flat=True)
-    decaissements_en_attente = Decaissement.objects.exclude(id__in=validated_ids)
-    en_attente_count = decaissements_en_attente.count()
+    # 🔹 IDs des décaissements déjà validés
+    validated_ids = list(validations.values_list('demande_decaissement_id', flat=True))
 
-    # 🔹 Sérialisation simple pour le frontend
-    decaissements_attente_list = [
-        {
-            "id": d.id,
-            "reference": getattr(d, "reference", ""),
-            "montant_total": getattr(d, "montant_total", 0),
-            "statut": getattr(d, "statut", "brouillon"),
-            "date_creation": getattr(d, "date_creation", None),
-            "date_decaissement": getattr(d, "date_decaissement", None)
-        }
-        for d in decaissements_en_attente
+    # 🔹 Récupération des décaissements via l'API Finance
+    try:
+        resp = requests.get(f"{settings.FINANCE_SERVICE_URL}/api/finance/decaissements/")
+        resp.raise_for_status()
+        decaissements = resp.json()
+    except requests.RequestException as e:
+        print(f"[Coordonnateur] Erreur récupération Finance: {e}")
+        decaissements = []
+
+    # 🔹 Filtrer les décaissements en attente
+    decaissements_en_attente = [
+        d for d in decaissements if d['id'] not in validated_ids
     ]
+    en_attente_count = len(decaissements_en_attente)
 
     return Response({
         "kpi": {
@@ -47,5 +48,5 @@ def dashboard_coordonnateur(request):
             "en_attente": en_attente_count,
         },
         "validations": serializer_validations.data,
-        "decaissements_en_attente": decaissements_attente_list
+        "decaissements_en_attente": decaissements_en_attente
     })
