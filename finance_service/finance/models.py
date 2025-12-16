@@ -29,6 +29,45 @@ class DemandeDecaissement(models.Model):
 
     def __str__(self):
         return f"Décaissement {self.reference or self.id} | {self.statut}"
+    
+    def save(self, *args, **kwargs):
+        if not self.reference:
+            now = self.date_creation or timezone.now()
+            with transaction.atomic():
+                last_count = DemandeDecaissement.objects.filter(date_creation__date=now.date()).count() + 1
+                self.reference = f"DEC-{now:%Y%m%d}-{last_count:03d}"
+                while DemandeDecaissement.objects.filter(reference=self.reference).exists():
+                    last_count += 1
+                    self.reference = f"DEC-{now:%Y%m%d}-{last_count:03d}"
+
+        # 🔹 Calcul du montant total automatiquement
+        total_rh = 0
+        total_stock = 0
+
+        # Récupérer les montants RH depuis le service RH
+        for rh_id in self.demandes_rh_ids:
+            try:
+                resp = requests.get(f"{settings.RH_SERVICE_URL}/api/demandes/{rh_id}/", timeout=5)
+                resp.raise_for_status()
+                data = resp.json()
+                total_rh += float(data.get('montant', 0))
+            except requests.RequestException:
+                pass
+
+        # Récupérer les montants stock depuis le service Stock
+        for stock_id in self.demandes_stock_ids:
+            try:
+                resp = requests.get(f"{settings.STOCK_SERVICE_URL}/api/demandes-achat/{stock_id}/", timeout=5)
+                resp.raise_for_status()
+                data = resp.json()
+                total_stock += float(data.get('montant_estime', 0))
+            except requests.RequestException:
+                pass
+
+        self.montant_total = Decimal(total_rh + total_stock)
+
+        super().save(*args, **kwargs)
+
 
     def save(self, *args, **kwargs):
         if not self.reference:
