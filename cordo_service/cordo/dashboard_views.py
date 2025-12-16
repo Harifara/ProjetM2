@@ -2,7 +2,6 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from cordo.models import ValidationCoordonnateur
-from finance.models import Decaissement
 from .serializers import ValidationCoordonnateurSerializer
 
 @api_view(['GET'])
