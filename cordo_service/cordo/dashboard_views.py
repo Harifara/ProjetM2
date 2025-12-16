@@ -1,7 +1,7 @@
-# coordonnateur/dashboard_views.py
+# cordo/dashboard_views.py
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from cordo.models import ValidationCoordonnateur
+from .models import ValidationCoordonnateur
 from .serializers import ValidationCoordonnateurSerializer
 import requests
 from django.conf import settings
@@ -9,9 +9,9 @@ from django.conf import settings
 @api_view(['GET'])
 def dashboard_coordonnateur(request):
     """
-    Retourne les données pour le dashboard du coordonnateur :
+    Dashboard coordonnateur :
     - KPI : total, approuvés, rejetés, en attente
-    - Décaissements validés et en attente via l'API Finance
+    - Décaissements en attente (récupérés via service Finance)
     """
     # 🔹 Toutes les validations existantes
     validations = ValidationCoordonnateur.objects.all()
@@ -22,31 +22,24 @@ def dashboard_coordonnateur(request):
     approuvees = validations.filter(decision='approuve').count()
     rejetees = validations.filter(decision='rejete').count()
 
-    # 🔹 IDs des décaissements déjà validés
-    validated_ids = list(validations.values_list('demande_decaissement_id', flat=True))
-
-    # 🔹 Récupération des décaissements via l'API Finance
+    # 🔹 Récupérer décaissements en attente depuis service Finance
     try:
-        resp = requests.get(f"{settings.FINANCE_SERVICE_URL}/api/finance/decaissements/")
+        resp = requests.get(f"{settings.FINANCE_SERVICE_URL}/api/finance/decaissements/en_attente/")
         resp.raise_for_status()
-        decaissements = resp.json()
-    except requests.RequestException as e:
-        print(f"[Coordonnateur] Erreur récupération Finance: {e}")
+        decaissements = resp.json()  # doit renvoyer une liste d'objets décaissements
+    except requests.RequestException:
         decaissements = []
 
-    # 🔹 Filtrer les décaissements en attente
-    decaissements_en_attente = [
-        d for d in decaissements if d['id'] not in validated_ids
-    ]
-    en_attente_count = len(decaissements_en_attente)
+    en_attente_count = len(decaissements)
 
+    # 🔹 Réponse consolidée pour le front
     return Response({
         "kpi": {
-            "total_validations": total_validations + en_attente_count,
-            "approuvees": approuvees,
-            "rejetees": rejetees,
+            "total": total_validations + en_attente_count,
+            "approuve": approuvees,
+            "rejete": rejetees,
             "en_attente": en_attente_count,
         },
+        "decaissements": decaissements,
         "validations": serializer_validations.data,
-        "decaissements_en_attente": decaissements_en_attente
     })
