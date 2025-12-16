@@ -1,7 +1,7 @@
 # coordonnateur/dashboard_views.py
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from coordonnateur.models import ValidationCoordonnateur
+from cordo.models import ValidationCoordonnateur
 from finance.models import Decaissement
 from .serializers import ValidationCoordonnateurSerializer
 
