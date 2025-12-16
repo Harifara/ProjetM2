@@ -25,7 +25,7 @@ router.register(r'mouvements-stock', MouvementStockViewSet, basename='mouvement-
 router.register(r'demandes-reapprovisionnement', DemandeReapprovisionnementViewSet, basename='demande-reappro')
 router.register(r'demandes-achat', DemandeAchatViewSet, basename='demande-achat')
 router.register(r'transferts-stock', TransfertStockViewSet, basename='transfert-stock')
-router.register(r'dashboard-stock/', dashboard_stock, basename='dashboard_stock')
+
 
 
 urlpatterns = [
@@ -33,6 +33,7 @@ urlpatterns = [
     # Endpoints personnalisés pour gérer les quantités
     path('stocks/<uuid:stock_id>/ajouter/', ajouter_stock, name='ajouter-stock'),
     path('stocks/<uuid:stock_id>/retirer/', retirer_stock, name='retirer-stock'),
+    path('dashboard-stock/', dashboard_stock, name='dashboard-stock'),
 ]
 
 
