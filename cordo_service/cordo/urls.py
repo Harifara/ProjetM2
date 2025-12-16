@@ -1,7 +1,9 @@
 # coordonnateur/urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import ValidationCoordonnateurViewSet, dashboard_coordonnateur
+from .views import ValidationCoordonnateurViewSet
+from .dashboard_views import dashboard_coordonnateur
+
 
 # Router pour le ViewSet
 router = DefaultRouter()
