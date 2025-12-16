@@ -10,6 +10,7 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework import viewsets, filters
 from rest_framework.permissions import IsAuthenticated
 import uuid
+from django.db import models  # pour F()
 import logging
 
 from django.core.exceptions import ValidationError

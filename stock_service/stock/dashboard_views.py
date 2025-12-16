@@ -2,6 +2,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .models import Article, Stock, MouvementStock, DemandeReapprovisionnement, TransfertStock, DemandeAchat
 from .serializers import ArticleSerializer, StockSerializer, DemandeReapprovisionnementSerializer, DemandeAchatSerializer
+from django.db import models
 
 @api_view(['GET'])
 def dashboard_stock(request):
