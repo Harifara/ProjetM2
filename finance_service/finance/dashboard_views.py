@@ -4,21 +4,14 @@ from rest_framework.response import Response
 from django.utils import timezone
 from datetime import timedelta
 from .models import DemandeDecaissement, Depense
-from django.db.models import Sum
-from django.db.models import Count, Avg, Max, Min
+from django.db.models import Sum, Count
 
-
-
-
+# Serializers
+from .serializers import DemandeDecaissementListSerializer, DepenseSerializer
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_finance(request):
-    """
-    Dashboard Finance
-    - KPI : demandes de décaissement, montants totaux, décaissements effectués
-    - Listes : dernières demandes, dernières dépenses
-    """
     today = timezone.now().date()
 
     # ------------------
@@ -39,7 +32,7 @@ def dashboard_finance(request):
     # Listes récentes (10 dernières)
     # ------------------
     lists = {
-        "decaissements": DemandeDecaissementSerializer(
+        "decaissements": DemandeDecaissementListSerializer(
             DemandeDecaissement.objects.order_by("-date_creation")[:10],
             many=True
         ).data,
@@ -50,7 +43,7 @@ def dashboard_finance(request):
     }
 
     # ------------------
-    # Charts simplifiés (optionnel)
+    # Charts simplifiés
     # ------------------
     charts = {
         "decaissements_par_statut": list(
