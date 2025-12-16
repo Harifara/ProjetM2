@@ -59,7 +59,6 @@ class DemandeDecaissementDetailSerializer(serializers.ModelSerializer):
             'demandes_stock_ids',
             'montant_total',
             'statut',
-            'cree_par_id',
             'date_creation',
             'date_decaissement',
             'depenses',
@@ -75,7 +74,6 @@ class DemandeDecaissementCreateSerializer(serializers.ModelSerializer):
             'demandes_rh_ids',
             'demandes_stock_ids',
             'montant_total',
-            'cree_par_id',
         ]
         read_only_fields = ['id']
 

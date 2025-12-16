@@ -21,7 +21,6 @@ class DemandeDecaissement(models.Model):
     demandes_stock_ids = models.JSONField(default=list, blank=True)
     montant_total = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
     statut = models.CharField(max_length=30, choices=STATUT_CHOICES, default='brouillon')
-    cree_par_id = models.UUIDField(help_text="UUID utilisateur finance")
     date_creation = models.DateTimeField(auto_now_add=True)
     date_decaissement = models.DateTimeField(null=True, blank=True)
 
