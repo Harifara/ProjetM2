@@ -4,6 +4,8 @@ from rest_framework.response import Response
 from django.utils import timezone
 from datetime import timedelta
 from .models import DemandeDecaissement, Depense
+from django.db.models import Sum
+from django.db.models import Count, Avg, Max, Min
 
 
 
