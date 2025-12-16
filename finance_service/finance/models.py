@@ -20,8 +20,8 @@ class DemandeDecaissement(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     reference = models.CharField(max_length=30, unique=True, blank=True)
-    demandes_rh_ids = models.JSONField(default=list, null=True, blank=True)
-    demandes_stock_ids = models.JSONField(default=list, null=True, blank=True)
+    demandes_rh_ids = models.JSONField(default=list, blank=True)
+    demandes_stock_ids = models.JSONField(default=list, blank=True)
     montant_total = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal("0.00"))
     statut = models.CharField(max_length=30, choices=STATUT_CHOICES, default='brouillon')
     date_creation = models.DateTimeField(auto_now_add=True)
@@ -34,47 +34,49 @@ class DemandeDecaissement(models.Model):
         return f"{self.reference} | {self.montant_total} Ar"
 
     # ------------------------------
-    # Gestion des montants
+    # Recalculer montant total avec batch
     # ------------------------------
     def recalculer_montant_total(self):
         total = Decimal("0.00")
-
         token = generate_service_token()
         headers = {"Authorization": f"Bearer {token}"}
 
-        # 🔹 Demandes RH
-        for rh_id in self.demandes_rh_ids:
+        # 🔹 Batch RH
+        if self.demandes_rh_ids:
             try:
-                resp = requests.get(
-                    f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/",
+                resp = requests.post(
+                    f"{settings.RH_SERVICE_URL}/api/rh/demandes/batch/",
+                    json={"ids": self.demandes_rh_ids},
                     headers=headers,
                     timeout=5
                 )
                 resp.raise_for_status()
-                montant = Decimal(str(resp.json().get("montant_total", 0)))
-                total += montant
+                for d in resp.json():
+                    montant = Decimal(str(d.get("montant_total", 0)))
+                    total += montant
             except requests.RequestException as e:
-                print(f"[Finance] RH indisponible pour {rh_id}: {e}")
+                print(f"[Finance] RH indisponible pour {self.demandes_rh_ids}: {e}")
 
-        # 🔹 Demandes Stock
-        for stock_id in self.demandes_stock_ids:
+        # 🔹 Batch Stock
+        if self.demandes_stock_ids:
             try:
-                resp = requests.get(
-                    f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/",
+                resp = requests.post(
+                    f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/batch/",
+                    json={"ids": self.demandes_stock_ids},
                     headers=headers,
                     timeout=5
                 )
                 resp.raise_for_status()
-                montant = Decimal(str(resp.json().get("montant_estime", 0)))
-                total += montant
+                for d in resp.json():
+                    montant = Decimal(str(d.get("montant_estime", 0)))
+                    total += montant
             except requests.RequestException as e:
-                print(f"[Finance] Stock indisponible pour {stock_id}: {e}")
+                print(f"[Finance] Stock indisponible pour {self.demandes_stock_ids}: {e}")
 
         self.montant_total = total
 
-
     # ------------------------------
-    # Vérification des demandes déjà utilisées
+    # Vérification des doublons
     # ------------------------------
     @classmethod
     def get_demandes_deja_utilisees(cls):
@@ -94,88 +96,65 @@ class DemandeDecaissement(models.Model):
                 raise ValidationError(f"Demande Stock déjà utilisée : {stock_id}")
 
     # ------------------------------
-    # Save / création
+    # Save / création avec référence unique
     # ------------------------------
     def save(self, *args, **kwargs):
         creating = self._state.adding
-
         self.full_clean()
-
         if creating:
             self.recalculer_montant_total()
 
         if not self.reference:
-            from django.db import IntegrityError
-
-            for _ in range(5):  # retry en cas de collision
+            for _ in range(5):
                 try:
                     with transaction.atomic():
                         today = timezone.now()
                         prefix = f"DEC-{today:%Y%m%d}"
-
                         last = (
                             DemandeDecaissement.objects
                             .filter(reference__startswith=prefix)
                             .order_by("-reference")
                             .first()
                         )
-
-                        if last:
-                            last_num = int(last.reference.split("-")[-1])
-                            next_num = last_num + 1
-                        else:
-                            next_num = 1
-
+                        next_num = int(last.reference.split("-")[-1]) + 1 if last else 1
                         self.reference = f"{prefix}-{next_num:03d}"
                         super().save(*args, **kwargs)
                     return
-                except IntegrityError:
+                except Exception:
                     continue
-
-            raise IntegrityError("Impossible de générer une référence unique")
+            raise ValidationError("Impossible de générer une référence unique")
 
         super().save(*args, **kwargs)
-
 
     # ------------------------------
     # Synchronisation RH / Stock
     # ------------------------------
     def synchroniser_status(self):
         status_map = {
-        'brouillon': 'en_decaissement',
-        'en_attente_coordonnateur': 'en_decaissement',
-        'approuve': 'valide',
-        'rejete': 'refuse',
-        'decaisse': 'decaisse',
-    }
-
+            'brouillon': 'en_decaissement',
+            'en_attente_coordonnateur': 'en_decaissement',
+            'approuve': 'valide',
+            'rejete': 'refuse',
+            'decaisse': 'decaisse',
+        }
         mapped_status = status_map.get(self.statut, 'en_decaissement')
-
         token = generate_service_token()
         headers = {"Authorization": f"Bearer {token}"}
 
-        for rh_id in self.demandes_rh_ids:
-            try:
-                requests.post(
-                    f"{settings.RH_SERVICE_URL}/api/rh/demandes/{rh_id}/update-status/",
-                    json={"status": mapped_status},
-                    headers=headers,
-                    timeout=5
-                )
-            except requests.RequestException as e:
-                print(f"[Finance] Impossible de synchroniser RH {rh_id}: {e}")
-
-        for stock_id in self.demandes_stock_ids:
-            try:
-                requests.post(
-                    f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/{stock_id}/update-status/",
-                    json={"statut": mapped_status},
-                    headers=headers,
-                    timeout=5
-                )
-            except requests.RequestException as e:
-                print(f"[Finance] Impossible de synchroniser Stock {stock_id}: {e}")
-
+        for service, ids, endpoint, key in [
+            ('RH', self.demandes_rh_ids, f"{settings.RH_SERVICE_URL}/api/rh/demandes/batch-update-status/", "status"),
+            ('Stock', self.demandes_stock_ids, f"{settings.STOCK_SERVICE_URL}/api/stock/demandes-achat/batch-update-status/", "statut")
+        ]:
+            if ids:
+                try:
+                    requests.post(
+                        endpoint,
+                        json={"ids": ids, key: mapped_status},
+                        headers=headers,
+                        timeout=5
+                    )
+                except requests.RequestException as e:
+                    print(f"[Finance] Impossible de synchroniser {service} {ids}: {e}")
 
     # ------------------------------
     # Actions
@@ -209,15 +188,9 @@ class DemandeDecaissement(models.Model):
     # ------------------------------
     @classmethod
     def demandes_recues(cls):
-        """
-        Retourne toutes les demandes qui ne sont pas encore en décaissement.
-        """
         return cls.objects.exclude(statut='en_decaissement').order_by('-date_creation')
 
 
-# ------------------------------
-# Dépenses liées
-# ------------------------------
 class Depense(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     decaissement = models.ForeignKey(DemandeDecaissement, on_delete=models.PROTECT, related_name='depenses')
