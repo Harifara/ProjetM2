@@ -4,7 +4,10 @@ from rest_framework.response import Response
 from django.utils import timezone
 from datetime import timedelta
 from .models import DemandeDecaissement, Depense
-from .serializers import DemandeDecaissementSerializer, DepenseSerializer
+
+
+
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
