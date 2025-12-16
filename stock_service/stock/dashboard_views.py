@@ -12,6 +12,7 @@ from .serializers import (
     CategorieSerializer, MagasinSerializer
 )
 
+
 @api_view(['GET'])
 def dashboard_stock(request):
     """
@@ -29,39 +30,39 @@ def dashboard_stock(request):
     transferts_en_attente = TransfertStock.objects.filter(statut='en_attente').count()
     demandes_achat_en_attente = DemandeAchat.objects.filter(statut='en_attente').count()
 
-    # ------------------
-    # Données pour tableaux
-    # ------------------
-    stocks = Stock.objects.select_related('article', 'magasin').all()[:50]
-    demandes_reappro = DemandeReapprovisionnement.objects.select_related('article','magasin').all()[:50]
-    demandes_achat = DemandeAchat.objects.select_related('article').all()[:50]
-
-    # ------------------
-    # Mouvements de stock
-    # ------------------
-    entrees_stock = MouvementStock.objects.filter(type_mouvement='entree').select_related(
-        'article', 'magasin_source', 'magasin_dest'
-    ).order_by('-date_mouvement')[:50]
-
-    sorties_stock = MouvementStock.objects.filter(type_mouvement='sortie').select_related(
-        'article', 'magasin_source', 'magasin_dest'
-    ).order_by('-date_mouvement')[:50]
-
     total_entrees = MouvementStock.objects.filter(type_mouvement='entree').count()
     total_sorties = MouvementStock.objects.filter(type_mouvement='sortie').count()
 
-    entrees_chart = [
-        {"article": m.article.nom, "quantite": m.quantite, "magasin": m.magasin_dest.nom if m.magasin_dest else None}
-        for m in entrees_stock
-    ]
+    # ------------------
+    # Stocks et mouvements récents
+    # ------------------
+    stocks = Stock.objects.select_related('article', 'magasin').all()[:50]
+    mouvements_entree = MouvementStock.objects.filter(type_mouvement='entree').select_related(
+        'article', 'magasin_source', 'magasin_dest'
+    ).order_by('-date_mouvement')[:50]
+    mouvements_sortie = MouvementStock.objects.filter(type_mouvement='sortie').select_related(
+        'article', 'magasin_source', 'magasin_dest'
+    ).order_by('-date_mouvement')[:50]
 
-    sorties_chart = [
+    # Chart data simplifié pour frontend
+    chart_entrees = [
+        {"article": m.article.nom, "quantite": m.quantite, "magasin": m.magasin_dest.nom if m.magasin_dest else None}
+        for m in mouvements_entree
+    ]
+    chart_sorties = [
         {"article": m.article.nom, "quantite": m.quantite, "magasin": m.magasin_source.nom if m.magasin_source else None}
-        for m in sorties_stock
+        for m in mouvements_sortie
     ]
 
     # ------------------
-    # Données catégories et magasins
+    # Demandes de réapprovisionnement et achats
+    # ------------------
+    demandes_reappro = DemandeReapprovisionnement.objects.select_related('article', 'magasin').all()[:50]
+    demandes_achat = DemandeAchat.objects.select_related('article').all()[:50]
+    transferts = TransfertStock.objects.select_related('article', 'magasin_source', 'magasin_dest').all()[:50]
+
+    # ------------------
+    # Catégories et magasins
     # ------------------
     categories = Categorie.objects.all()
     magasins = Magasin.objects.all()
@@ -79,11 +80,23 @@ def dashboard_stock(request):
         "stocks": StockSerializer(stocks, many=True).data,
         "demandes_reappro": DemandeReapprovisionnementSerializer(demandes_reappro, many=True).data,
         "demandes_achat": DemandeAchatSerializer(demandes_achat, many=True).data,
+        "transferts": [
+            {
+                "id": t.id,
+                "article": t.article.nom,
+                "magasin_source": t.magasin_source.nom,
+                "magasin_dest": t.magasin_dest.nom,
+                "quantite": t.quantite,
+                "statut": t.statut,
+                "date_transfert": t.date_transfert,
+                "commentaire": t.commentaire,
+            } for t in transferts
+        ],
         "mouvements": {
-            "entrees": MouvementStockSerializer(entrees_stock, many=True).data,
-            "sorties": MouvementStockSerializer(sorties_stock, many=True).data,
-            "chart_entrees": entrees_chart,
-            "chart_sorties": sorties_chart,
+            "entrees": MouvementStockSerializer(mouvements_entree, many=True).data,
+            "sorties": MouvementStockSerializer(mouvements_sortie, many=True).data,
+            "chart_entrees": chart_entrees,
+            "chart_sorties": chart_sorties,
         },
         "categories": CategorieSerializer(categories, many=True).data,
         "magasins": MagasinSerializer(magasins, many=True).data,
