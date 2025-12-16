@@ -38,6 +38,8 @@ def dashboard_rh(request):
 
         # 🔐 Vérification permissions via rôle dans JWT
         role = getattr(user, "role", None)
+        if not role:
+            return Response({"detail": "Rôle manquant dans le token"}, status=403)
         if role not in ["responsable_rh", "admin"]:
             return Response({"detail": "Accès refusé"}, status=403)
 
