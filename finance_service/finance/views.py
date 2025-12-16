@@ -1,4 +1,3 @@
-# finance/views.py
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -9,6 +8,7 @@ from .serializers import DemandeDecaissementSerializer, DepenseSerializer
 import requests
 from django.conf import settings
 import jwt
+
 
 # 🔹 Générer un JWT pour les requêtes inter-services
 def get_service_jwt():
@@ -59,8 +59,7 @@ class DemandeDecaissementViewSet(viewsets.ModelViewSet):
         Récupère toutes les demandes RH et Stock avec le statut 'en_attente'
         qui ne sont pas déjà utilisées dans un décaissement.
         """
-        rh_demandes = []
-        stock_demandes = []
+        rh_demandes, stock_demandes = [], []
         token = get_service_jwt()
         headers = {"Authorization": f"Bearer {token}"}
 
