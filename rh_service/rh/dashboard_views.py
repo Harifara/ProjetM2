@@ -91,6 +91,11 @@ def dashboard_rh(request):
         "demandes_par_statut": list(
             Demande.objects.values("status").annotate(total=Count("id"))
         ),
+        "employes_par_sexe": list(
+            Employer.objects.values("sexe").annotate(total=Count("id"))
+        )
+        
+
     }
 
     return Response({
